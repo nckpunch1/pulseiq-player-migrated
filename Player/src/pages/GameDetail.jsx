@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import { useAuth } from '../hooks/useAuth'
 import './game-detail.css'
 
 function parseDate(val) {
@@ -49,7 +48,6 @@ function SizePicker({ value, onChange, disabled }) {
 
 export default function GameDetail() {
   const { id: canonicalSessionId } = useParams()
-  const { isCaptain } = useAuth()
 
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -60,15 +58,35 @@ export default function GameDetail() {
   const [actionError, setActionError] = useState('')
 
   useEffect(() => {
-    api.getGameDetails(canonicalSessionId)
-      .then(data => {
-        setDetail(data)
-        if (data.registration?.confirmed_team_size) {
-          setTeamSize(data.registration.confirmed_team_size)
+    ;(async () => {
+      try {
+        let data
+        try {
+          data = await api.getGameDetails(canonicalSessionId)
+        } catch (err) {
+          if (err.code === 'SERVER_ERROR' || err.code === 'GAME_DETAILS_FAILED') {
+            await new Promise(r => setTimeout(r, 1000))
+            data = await api.getGameDetails(canonicalSessionId) // one retry
+          } else {
+            throw err
+          }
         }
-      })
-      .catch(err => setPageError(err.message ?? 'Failed to load game.'))
-      .finally(() => setLoading(false))
+        setDetail(data)
+        const initialSize = data.registration?.expected_team_size ?? data.registration?.confirmed_team_size
+        if (initialSize) setTeamSize(initialSize)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[game detail fields]', {
+            can_confirm_attendance: data?.can_confirm_attendance,
+            attendance_status: data?.registration?.attendance_status,
+            isCaptain: data?.is_captain,
+          })
+        }
+      } catch (err) {
+        setPageError(err.message ?? 'Failed to load game.')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [canonicalSessionId])
 
   async function handleRegister() {
@@ -128,10 +146,16 @@ export default function GameDetail() {
     )
   }
 
-  const { game, team, registration, can_register, can_confirm_attendance } = detail
+  const { game, team } = detail
+  const canConfirmAttendance = detail?.can_confirm_attendance === true
+  const isCaptain = detail?.is_captain === true
+  const canRegister = detail?.can_register === true
+  const registration = detail?.registration
+  const attendanceStatus = detail?.registration?.attendance_status
   const hasTeam = !!team
   const isRegistered = !!registration
-  const attendanceConfirmed = registration?.attendance_status === 'confirmed'
+  const attendanceConfirmed = attendanceStatus === 'confirmed'
+  const showConfirmAttendance = canConfirmAttendance
 
   return (
     <div className="gd-page">
@@ -170,7 +194,7 @@ export default function GameDetail() {
         )}
 
         {/* Registration open — captain */}
-        {hasTeam && can_register && isCaptain && (
+        {hasTeam && canRegister && isCaptain && (
           <div className="gd-card">
             {actionError && <div className="gd-error-banner">{actionError}</div>}
             <p className="gd-action-prompt">How many players will attend?</p>
@@ -186,14 +210,14 @@ export default function GameDetail() {
         )}
 
         {/* Registration open — non-captain */}
-        {hasTeam && can_register && !isCaptain && (
+        {hasTeam && canRegister && !isCaptain && (
           <div className="gd-card gd-card--info">
             <p className="gd-readonly-note">Only your team captain can register for games.</p>
           </div>
         )}
 
         {/* Attendance confirmation — captain */}
-        {hasTeam && can_confirm_attendance && isCaptain && (
+        {hasTeam && showConfirmAttendance && isCaptain && (
           <div className="gd-card">
             {actionError && <div className="gd-error-banner">{actionError}</div>}
             {registration && (
@@ -214,7 +238,7 @@ export default function GameDetail() {
         )}
 
         {/* Attendance confirmation — non-captain */}
-        {hasTeam && can_confirm_attendance && !isCaptain && (
+        {hasTeam && showConfirmAttendance && !isCaptain && (
           <div className="gd-card gd-card--info">
             {registration && (
               <p className="gd-registered-team">
@@ -226,7 +250,7 @@ export default function GameDetail() {
         )}
 
         {/* Registered, no current action */}
-        {hasTeam && isRegistered && !can_register && !can_confirm_attendance && (
+        {hasTeam && isRegistered && !canRegister && !showConfirmAttendance && (
           <div className="gd-card">
             <div className="gd-status-row">
               <span className="gd-status-check">✓</span>
@@ -254,7 +278,7 @@ export default function GameDetail() {
         )}
 
         {/* Has team, not registered, registration not open */}
-        {hasTeam && !isRegistered && !can_register && (
+        {hasTeam && !isRegistered && !canRegister && (
           <div className="gd-card gd-card--info">
             <p className="gd-readonly-note">
               Registration is not currently open for this game.

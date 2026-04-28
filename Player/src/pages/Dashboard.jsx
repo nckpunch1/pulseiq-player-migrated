@@ -23,10 +23,26 @@ export default function Dashboard() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.dashboard()
-      .then(setData)
-      .catch(err => setError(err.message ?? 'Failed to load dashboard.'))
-      .finally(() => setLoading(false))
+    ;(async () => {
+      try {
+        let data
+        try {
+          data = await api.dashboard()
+        } catch (err) {
+          if (err.code === 'SERVER_ERROR') {
+            await new Promise(r => setTimeout(r, 800))
+            data = await api.dashboard() // one retry
+          } else {
+            throw err
+          }
+        }
+        setData(data)
+      } catch (err) {
+        setError(err.message ?? 'Failed to load dashboard.')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
 
   if (loading) {
