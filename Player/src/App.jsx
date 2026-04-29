@@ -7,7 +7,8 @@ import Team        from './pages/Team.jsx'
 import Games       from './pages/Games.jsx'
 import GameDetail    from './pages/GameDetail.jsx'
 import Leaderboard  from './pages/Leaderboard.jsx'
-import BottomNav    from './components/BottomNav.jsx'
+import BottomNav        from './components/BottomNav.jsx'
+import MiniGameOverlay  from './components/MiniGameOverlay.jsx'
 
 // ─── Route guards ─────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ function ProtectedRoute() {
   if (!isLoggedIn) return <Navigate to="/login" replace />
   return (
     <>
+      <MiniGameOverlay />
       <Outlet />
       <BottomNav />
     </>
