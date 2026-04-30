@@ -10,7 +10,7 @@ function formatSecondsAgo(secs) {
 }
 
 function GameStateBadge({ state }) {
-  if (state === 'live') {
+  if (state === 'round_active' || state === 'round_results') {
     return (
       <span className="lg-badge lg-badge--live">
         <span className="lg-badge-dot" />
@@ -18,7 +18,7 @@ function GameStateBadge({ state }) {
       </span>
     )
   }
-  if (state === 'completed') {
+  if (state === 'game_over') {
     return <span className="lg-badge lg-badge--completed">COMPLETED</span>
   }
   return <span className="lg-badge lg-badge--scheduled">SCHEDULED</span>
@@ -43,12 +43,11 @@ export default function LiveGame() {
   }, [])
 
   const d = lastKnownGoodState
-  const gameState = d?.game_state
-  const myTeam = d?.my_team
+  const gameState = d?.game?.live_state
   const currentRound = d?.current_round
   const leaderboard = d?.leaderboard ?? []
   const roundScores = d?.round_scores ?? []
-  const showLeaderboard = d?.show_leaderboard && leaderboard.length > 0
+  const showLeaderboard = leaderboard.length > 0
 
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
@@ -75,14 +74,14 @@ export default function LiveGame() {
   }
 
   // ── No team ──────────────────────────────────────────────────────
-  if (!myTeam) {
+  if (!d?.team && !d?.registration) {
     return (
       <div className="lg-page">
         <header className="lg-header">
           <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
           <div className="lg-header-center">
-            <p className="lg-game-title">{d?.game_title ?? 'Live Game'}</p>
-            {d?.venue && <p className="lg-game-venue">{d.venue}</p>}
+            <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
+            {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
           </div>
           {gameState && <GameStateBadge state={gameState} />}
         </header>
@@ -97,15 +96,15 @@ export default function LiveGame() {
 
   // ── Not registered ───────────────────────────────────────────────
   const isRegistered =
-    d?.registration_status === 'confirmed' || d?.registration_status === 'registered'
+    d?.registration?.registration_status === 'confirmed' || d?.registration?.registration_status === 'registered'
   if (!isRegistered) {
     return (
       <div className="lg-page">
         <header className="lg-header">
           <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
           <div className="lg-header-center">
-            <p className="lg-game-title">{d?.game_title ?? 'Live Game'}</p>
-            {d?.venue && <p className="lg-game-venue">{d.venue}</p>}
+            <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
+            {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
           </div>
           <GameStateBadge state={gameState} />
         </header>
@@ -126,8 +125,8 @@ export default function LiveGame() {
       <header className="lg-header">
         <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
         <div className="lg-header-center">
-          <p className="lg-game-title">{d.game_title}</p>
-          <p className="lg-game-venue">{d.venue}</p>
+          <p className="lg-game-title">{d.game?.title}</p>
+          <p className="lg-game-venue">{d.game?.venue}</p>
         </div>
         <GameStateBadge state={gameState} />
       </header>
@@ -141,8 +140,8 @@ export default function LiveGame() {
         </div>
       )}
 
-      {/* ── SCHEDULED ── */}
-      {gameState === 'scheduled' && (
+      {/* ── LOBBY ── */}
+      {gameState === 'lobby' && (
         <div className="lg-waiting">
           <span className="lg-waiting-icon">⚡</span>
           <p className="lg-waiting-title">Waiting for host to start the game</p>
@@ -151,7 +150,7 @@ export default function LiveGame() {
       )}
 
       {/* ── LIVE ── */}
-      {gameState === 'live' && (
+      {(gameState === 'round_active' || gameState === 'round_results') && (
         <>
           {/* Round card */}
           <section className="lg-section">
@@ -159,9 +158,9 @@ export default function LiveGame() {
               {currentRound ? (
                 <>
                   <p className="lg-round-label">
-                    ROUND {currentRound.number} OF {currentRound.total_rounds}
+                    ROUND {currentRound.round_number}
                   </p>
-                  <h2 className="lg-round-name">{currentRound.name}</h2>
+                  <h2 className="lg-round-name">{currentRound.title}</h2>
                   {currentRound.description && (
                     <p className="lg-round-desc">{currentRound.description}</p>
                   )}
@@ -176,13 +175,13 @@ export default function LiveGame() {
           {/* My team score */}
           <section className="lg-section">
             <div className="lg-score-card">
-              <p className="lg-score-team">{myTeam.team_name}</p>
-              <p className="lg-score-big">{myTeam.total_score}</p>
-              {myTeam.current_rank && (
-                <span className="lg-rank-tag">RANK #{myTeam.current_rank}</span>
+              <p className="lg-score-team">{d?.team?.name}</p>
+              <p className="lg-score-big">{d?.team_score?.total_score}</p>
+              {d?.team_score?.rank && (
+                <span className="lg-rank-tag">RANK #{d?.team_score?.rank}</span>
               )}
-              {myTeam.current_round_score > 0 && (
-                <p className="lg-round-score-sub">Round score: {myTeam.current_round_score} pts</p>
+              {d?.team_score?.current_round_score > 0 && (
+                <p className="lg-round-score-sub">Round score: {d?.team_score?.current_round_score} pts</p>
               )}
             </div>
           </section>
@@ -210,7 +209,7 @@ export default function LiveGame() {
                 {leaderboard.map(entry => (
                   <div
                     key={entry.rank}
-                    className={`lg-lb-row${entry.is_my_team ? ' lg-lb-row--mine' : ''}`}
+                    className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
                   >
                     <span className="lg-lb-rank">
                       {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
@@ -225,8 +224,8 @@ export default function LiveGame() {
         </>
       )}
 
-      {/* ── COMPLETED ── */}
-      {gameState === 'completed' && (
+      {/* ── GAME OVER ── */}
+      {gameState === 'game_over' && (
         <>
           <div className="lg-gameover">
             <h1 className="lg-gameover-heading">GAME OVER</h1>
@@ -238,7 +237,7 @@ export default function LiveGame() {
               {leaderboard.map(entry => (
                 <div
                   key={entry.rank}
-                  className={`lg-lb-row${entry.is_my_team ? ' lg-lb-row--mine' : ''}`}
+                  className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
                 >
                   <span className="lg-lb-rank">
                     {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
@@ -252,10 +251,10 @@ export default function LiveGame() {
 
           <section className="lg-section">
             <div className="lg-final-card">
-              <p className="lg-score-team">{myTeam.team_name}</p>
-              <p className="lg-score-big">{myTeam.total_score}</p>
-              {myTeam.current_rank && (
-                <span className="lg-rank-tag">RANK #{myTeam.current_rank}</span>
+              <p className="lg-score-team">{d?.team?.name}</p>
+              <p className="lg-score-big">{d?.team_score?.total_score}</p>
+              {d?.team_score?.rank && (
+                <span className="lg-rank-tag">RANK #{d?.team_score?.rank}</span>
               )}
             </div>
           </section>

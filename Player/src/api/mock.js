@@ -292,22 +292,31 @@ export const mockApi = {
       case 'externalPlayerGetPaperLiveState': {
         const call = ++paperLiveStateCallCount
         const now = new Date().toISOString()
-        const base = {
-          game_id: 'game_001',
-          game_title: 'Wednesday Night Quiz',
+
+        const game = {
+          id: 'game_001',
+          title: 'Wednesday Night Quiz',
           venue: 'The Pig & Whistle',
+        }
+        const team = { id: 'team_001', name: 'Brick to the face' }
+        const membership = { is_captain: false, is_scribe: false, effective_is_scribe: false }
+        const registration = {
+          id: 'reg_001',
+          status: 'confirmed',
           registration_status: 'confirmed',
           attendance_status: 'confirmed',
+          expected_team_size: 4,
+          confirmed_team_size: 4,
         }
-        const myTeamBase = { team_id: 'team_001', team_name: 'Brick to the face' }
 
         if (call <= 3) {
           return {
             success: true, data: {
-              ...base, game_state: 'scheduled',
-              my_team: { ...myTeamBase, total_score: 0, current_rank: null, current_round_score: 0 },
-              current_round: null, round_scores: [], leaderboard: [], show_leaderboard: false,
-              last_updated_at: now,
+              game: { ...game, live_state: 'lobby' },
+              team, membership, registration,
+              team_score: { team_id: 'team_001', team_name: 'Brick to the face', total_score: 0, current_round_score: 0, rank: null, games_played: 0 },
+              current_round: null, round_scores: [], leaderboard: [],
+              message: '', last_updated_at: now,
             },
           }
         }
@@ -315,40 +324,42 @@ export const mockApi = {
         if (call <= 6) {
           return {
             success: true, data: {
-              ...base, game_state: 'live',
-              my_team: { ...myTeamBase, total_score: 0, current_rank: null, current_round_score: 0 },
+              game: { ...game, live_state: 'round_active' },
+              team, membership, registration,
+              team_score: { team_id: 'team_001', team_name: 'Brick to the face', total_score: 0, current_round_score: 0, rank: null, games_played: 0 },
               current_round: {
-                number: 1, total_rounds: 6, name: 'General Knowledge',
+                round_index: 0, round_number: 1, title: 'General Knowledge',
                 description: 'A mix of everything', round_type: 'standard',
-                question_count: 10, status: 'round_active',
+                is_betting_round: false, question_count: 10, points_available: 10,
               },
-              round_scores: [], leaderboard: [], show_leaderboard: false,
-              last_updated_at: now,
+              round_scores: [], leaderboard: [],
+              message: '', last_updated_at: now,
             },
           }
         }
 
         const leaderboard5 = [
-          { rank: 1, team_name: 'Danger Noodles', total_score: 10, is_my_team: false },
-          { rank: 2, team_name: 'Brick to the face', total_score: 8, is_my_team: true },
-          { rank: 3, team_name: 'Team Chaos', total_score: 7, is_my_team: false },
-          { rank: 4, team_name: 'Quizzy Rascals', total_score: 6, is_my_team: false },
-          { rank: 5, team_name: 'Brain Drains', total_score: 4, is_my_team: false },
+          { rank: 1, team_id: 'team_002', team_name: 'Danger Noodles', total_score: 10, current_round_score: 10 },
+          { rank: 2, team_id: 'team_001', team_name: 'Brick to the face', total_score: 8, current_round_score: 8 },
+          { rank: 3, team_id: 'team_003', team_name: 'Team Chaos', total_score: 7, current_round_score: 7 },
+          { rank: 4, team_id: 'team_004', team_name: 'Quizzy Rascals', total_score: 6, current_round_score: 6 },
+          { rank: 5, team_id: 'team_005', team_name: 'Brain Drains', total_score: 4, current_round_score: 4 },
         ]
         const round1Score = [{ round_number: 1, round_name: 'General Knowledge', score: 8 }]
 
         if (call <= 9) {
           return {
             success: true, data: {
-              ...base, game_state: 'live',
-              my_team: { ...myTeamBase, total_score: 8, current_rank: 2, current_round_score: 8 },
+              game: { ...game, live_state: 'round_results' },
+              team, membership, registration,
+              team_score: { team_id: 'team_001', team_name: 'Brick to the face', total_score: 8, current_round_score: 8, rank: 2, games_played: 0 },
               current_round: {
-                number: 1, total_rounds: 6, name: 'General Knowledge',
+                round_index: 0, round_number: 1, title: 'General Knowledge',
                 description: 'A mix of everything', round_type: 'standard',
-                question_count: 10, status: 'round_results',
+                is_betting_round: false, question_count: 10, points_available: 10,
               },
-              round_scores: round1Score, leaderboard: leaderboard5, show_leaderboard: true,
-              last_updated_at: now,
+              round_scores: round1Score, leaderboard: leaderboard5,
+              message: '', last_updated_at: now,
             },
           }
         }
@@ -356,23 +367,25 @@ export const mockApi = {
         if (call <= 12) {
           return {
             success: true, data: {
-              ...base, game_state: 'live',
-              my_team: { ...myTeamBase, total_score: 8, current_rank: 2, current_round_score: 0 },
+              game: { ...game, live_state: 'round_active' },
+              team, membership, registration,
+              team_score: { team_id: 'team_001', team_name: 'Brick to the face', total_score: 8, current_round_score: 0, rank: 2, games_played: 0 },
               current_round: {
-                number: 2, total_rounds: 6, name: 'Science & Nature',
+                round_index: 1, round_number: 2, title: 'Science & Nature',
                 description: 'From atoms to ecosystems', round_type: 'standard',
-                question_count: 10, status: 'round_active',
+                is_betting_round: false, question_count: 10, points_available: 10,
               },
-              round_scores: round1Score, leaderboard: [], show_leaderboard: false,
-              last_updated_at: now,
+              round_scores: round1Score, leaderboard: [],
+              message: '', last_updated_at: now,
             },
           }
         }
 
         return {
           success: true, data: {
-            ...base, game_state: 'completed',
-            my_team: { ...myTeamBase, total_score: 52, current_rank: 2, current_round_score: 0 },
+            game: { ...game, live_state: 'game_over' },
+            team, membership, registration,
+            team_score: { team_id: 'team_001', team_name: 'Brick to the face', total_score: 52, current_round_score: 0, rank: 2, games_played: 1 },
             current_round: null,
             round_scores: [
               { round_number: 1, round_name: 'General Knowledge', score: 8 },
@@ -383,14 +396,13 @@ export const mockApi = {
               { round_number: 6, round_name: 'Pot Luck', score: 9 },
             ],
             leaderboard: [
-              { rank: 1, team_name: 'Danger Noodles', total_score: 55, is_my_team: false },
-              { rank: 2, team_name: 'Brick to the face', total_score: 52, is_my_team: true },
-              { rank: 3, team_name: 'Team Chaos', total_score: 48, is_my_team: false },
-              { rank: 4, team_name: 'Quizzy Rascals', total_score: 45, is_my_team: false },
-              { rank: 5, team_name: 'Brain Drains', total_score: 38, is_my_team: false },
+              { rank: 1, team_id: 'team_002', team_name: 'Danger Noodles', total_score: 55, current_round_score: 0 },
+              { rank: 2, team_id: 'team_001', team_name: 'Brick to the face', total_score: 52, current_round_score: 0 },
+              { rank: 3, team_id: 'team_003', team_name: 'Team Chaos', total_score: 48, current_round_score: 0 },
+              { rank: 4, team_id: 'team_004', team_name: 'Quizzy Rascals', total_score: 45, current_round_score: 0 },
+              { rank: 5, team_id: 'team_005', team_name: 'Brain Drains', total_score: 38, current_round_score: 0 },
             ],
-            show_leaderboard: true,
-            last_updated_at: now,
+            message: '', last_updated_at: now,
           },
         }
       }

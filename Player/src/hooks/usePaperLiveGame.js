@@ -45,7 +45,7 @@ export function usePaperLiveGame(gameId) {
         setIsReconnecting(false)
 
         // Schedule polling stop once, 30s after first completed response
-        if (data.game_state === 'completed' && !completionTimerRef.current) {
+        if (data.game?.live_state === 'game_over' && !completionTimerRef.current) {
           completionTimerRef.current = setTimeout(() => {
             stopInterval()
             completionTimerRef.current = null
