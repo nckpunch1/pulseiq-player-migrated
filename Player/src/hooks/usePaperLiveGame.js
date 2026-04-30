@@ -1,8 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api/client'
 
-const POLL_INTERVAL = 5000
+const BASE_INTERVAL = 5_000
 const COMPLETION_LINGER = 30_000
+
+function backoffInterval(failures) {
+  if (failures >= 4) return 15_000
+  if (failures === 3) return 12_000
+  if (failures === 2) return 8_000
+  return 5_000  // 0 or 1 failure
+}
 
 export function usePaperLiveGame(gameId) {
   const [liveState, setLiveState] = useState(null)
@@ -10,13 +17,12 @@ export function usePaperLiveGame(gameId) {
   const [isPolling, setIsPolling] = useState(false)
   const [isReconnecting, setIsReconnecting] = useState(false)
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
+  const [lastPollAttempt, setLastPollAttempt] = useState(null)
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
 
-  const intervalRef = useRef(null)
   const completionTimerRef = useRef(null)
   const mountedRef = useRef(true)
 
-  // True only on the very first load, before any response has arrived
   const loading = lastKnownGoodState === null
 
   useEffect(() => {
@@ -27,44 +33,71 @@ export function usePaperLiveGame(gameId) {
   useEffect(() => {
     if (!gameId) return
 
-    const stopInterval = () => {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
+    let stopped = false
+    let timeoutId = null
+    let failures = 0
+    let pollCount = 0
+
+    const stopPolling = () => {
+      stopped = true
+      clearTimeout(timeoutId)
       if (mountedRef.current) setIsPolling(false)
     }
 
-    const poll = async () => {
+    const schedule = (delay) => {
+      timeoutId = setTimeout(doPoll, delay)
+    }
+
+    async function doPoll() {
+      if (stopped) return
+
+      const attempt = ++pollCount
+      if (mountedRef.current) setLastPollAttempt(new Date())
+
       try {
         const data = await api.getPaperLiveState(gameId)
-        if (!mountedRef.current) return
+        if (stopped || !mountedRef.current) return
 
+        failures = 0
         setLiveState(data)
         setLastKnownGoodState(data)
         setLastUpdatedAt(new Date())
         setConsecutiveFailures(0)
         setIsReconnecting(false)
 
-        // Schedule polling stop once, 30s after first completed response
-        if (data.game?.live_state === 'game_over' && !completionTimerRef.current) {
+        if (import.meta.env.DEV) {
+          console.log('[poll]', { attempt, gameId, live_state: data?.game?.live_state })
+        }
+
+        if (data.game?.live_state === 'finished' && !completionTimerRef.current) {
           completionTimerRef.current = setTimeout(() => {
-            stopInterval()
+            stopPolling()
             completionTimerRef.current = null
           }, COMPLETION_LINGER)
         }
+
+        if (!stopped) schedule(BASE_INTERVAL)
       } catch {
-        if (!mountedRef.current) return
-        setConsecutiveFailures(prev => prev + 1)
+        if (stopped || !mountedRef.current) return
+
+        failures++
+        setConsecutiveFailures(failures)
         setIsReconnecting(true)
+
+        if (import.meta.env.DEV) {
+          console.log('[poll]', { attempt, gameId, live_state: undefined })
+        }
+
+        if (!stopped) schedule(backoffInterval(failures))
       }
     }
 
     setIsPolling(true)
-    poll()
-    intervalRef.current = setInterval(poll, POLL_INTERVAL)
+    doPoll()
 
     return () => {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
+      stopped = true
+      clearTimeout(timeoutId)
       clearTimeout(completionTimerRef.current)
       completionTimerRef.current = null
     }
@@ -76,6 +109,7 @@ export function usePaperLiveGame(gameId) {
     isPolling,
     isReconnecting,
     lastUpdatedAt,
+    lastPollAttempt,
     consecutiveFailures,
     loading,
   }

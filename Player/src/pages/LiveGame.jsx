@@ -9,8 +9,8 @@ function formatSecondsAgo(secs) {
   return `${Math.floor(secs / 60)}m ago`
 }
 
-function GameStateBadge({ state }) {
-  if (state === 'round_active' || state === 'round_results') {
+function GameStateBadge({ status }) {
+  if (status === 'live') {
     return (
       <span className="lg-badge lg-badge--live">
         <span className="lg-badge-dot" />
@@ -18,10 +18,24 @@ function GameStateBadge({ state }) {
       </span>
     )
   }
-  if (state === 'game_over') {
+  if (status === 'completed') {
     return <span className="lg-badge lg-badge--completed">COMPLETED</span>
   }
   return <span className="lg-badge lg-badge--scheduled">SCHEDULED</span>
+}
+
+function TeamScoreCard({ team, teamScore }) {
+  return (
+    <section className="lg-section">
+      <div className="lg-score-card">
+        <p className="lg-score-team">{team?.name}</p>
+        <p className="lg-score-big">{teamScore?.total_score ?? 0}</p>
+        {teamScore?.rank && (
+          <span className="lg-rank-tag">RANK #{teamScore.rank}</span>
+        )}
+      </div>
+    </section>
+  )
 }
 
 export default function LiveGame() {
@@ -43,11 +57,13 @@ export default function LiveGame() {
   }, [])
 
   const d = lastKnownGoodState
-  const gameState = d?.game?.live_state
+  const liveState = d?.game?.live_state ?? null
+  const gameStatus = d?.game?.status
   const currentRound = d?.current_round
   const leaderboard = d?.leaderboard ?? []
   const roundScores = d?.round_scores ?? []
-  const showLeaderboard = leaderboard.length > 0
+
+  const isLobby = !liveState || liveState === 'lobby'
 
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
@@ -83,7 +99,7 @@ export default function LiveGame() {
             <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
             {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
           </div>
-          {gameState && <GameStateBadge state={gameState} />}
+          {gameStatus && <GameStateBadge status={gameStatus} />}
         </header>
         <div className="lg-state-fill">
           <div className="lg-info-card">
@@ -106,7 +122,7 @@ export default function LiveGame() {
             <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
             {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
           </div>
-          <GameStateBadge state={gameState} />
+          <GameStateBadge status={gameStatus} />
         </header>
         <div className="lg-state-fill">
           <div className="lg-info-card">
@@ -128,7 +144,7 @@ export default function LiveGame() {
           <p className="lg-game-title">{d.game?.title}</p>
           <p className="lg-game-venue">{d.game?.venue}</p>
         </div>
-        <GameStateBadge state={gameState} />
+        <GameStateBadge status={gameStatus} />
       </header>
 
       {/* ── Reconnection bar ── */}
@@ -140,53 +156,75 @@ export default function LiveGame() {
         </div>
       )}
 
-      {/* ── LOBBY ── */}
-      {gameState === 'lobby' && (
+      {/* ── LOBBY / null ── */}
+      {isLobby && (
         <div className="lg-waiting">
           <span className="lg-waiting-icon">⚡</span>
           <p className="lg-waiting-title">Waiting for host to start the game</p>
-          <p className="lg-waiting-sub">This screen will update automatically</p>
+          <p className="lg-waiting-sub">This screen updates automatically</p>
         </div>
       )}
 
-      {/* ── LIVE ── */}
-      {(gameState === 'round_active' || gameState === 'round_results') && (
-        <>
-          {/* Round card */}
-          <section className="lg-section">
-            <div className="lg-round-card">
-              {currentRound ? (
-                <>
-                  <p className="lg-round-label">
-                    ROUND {currentRound.round_number}
-                  </p>
-                  <h2 className="lg-round-name">{currentRound.title}</h2>
-                  {currentRound.description && (
-                    <p className="lg-round-desc">{currentRound.description}</p>
-                  )}
+      {/* ── Team score card — all states except lobby ── */}
+      {!isLobby && (
+        <TeamScoreCard team={d?.team} teamScore={d?.team_score} />
+      )}
+
+      {/* ── ROUND INTRO ── */}
+      {liveState === 'round_intro' && (
+        <section className="lg-section">
+          <div className="lg-round-card">
+            {currentRound ? (
+              <>
+                <p className="lg-round-label">ROUND {currentRound.round_number}</p>
+                <h2 className="lg-round-name">{currentRound.title}</h2>
+                <p className="lg-round-intro-sub">Get ready — round starting soon</p>
+                {currentRound.question_count && (
                   <span className="lg-round-qtag">{currentRound.question_count} questions</span>
-                </>
-              ) : (
-                <p className="lg-round-waiting">Waiting for host to start the next round…</p>
-              )}
-            </div>
-          </section>
+                )}
+              </>
+            ) : (
+              <p className="lg-round-waiting">Preparing next round...</p>
+            )}
+          </div>
+        </section>
+      )}
 
-          {/* My team score */}
-          <section className="lg-section">
-            <div className="lg-score-card">
-              <p className="lg-score-team">{d?.team?.name}</p>
-              <p className="lg-score-big">{d?.team_score?.total_score}</p>
-              {d?.team_score?.rank && (
-                <span className="lg-rank-tag">RANK #{d?.team_score?.rank}</span>
-              )}
-              {d?.team_score?.current_round_score > 0 && (
-                <p className="lg-round-score-sub">Round score: {d?.team_score?.current_round_score} pts</p>
-              )}
-            </div>
-          </section>
+      {/* ── PAPER ROUND ACTIVE ── */}
+      {liveState === 'paper_round_active' && (
+        <section className="lg-section">
+          <div className="lg-round-card">
+            {currentRound ? (
+              <>
+                <p className="lg-round-label">ROUND {currentRound.round_number}</p>
+                <h2 className="lg-round-name">{currentRound.title}</h2>
+                <p className="lg-round-active-sub">Round in progress — write your answers</p>
+                <div className="lg-round-meta">
+                  {currentRound.question_count && (
+                    <span className="lg-round-qtag">{currentRound.question_count} questions</span>
+                  )}
+                  {currentRound.points_available && (
+                    <span className="lg-round-qtag">{currentRound.points_available} pts available</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="lg-round-waiting">Round in progress</p>
+            )}
+          </div>
+        </section>
+      )}
 
-          {/* Round-by-round scores */}
+      {/* ── PAPER SCORING ── */}
+      {liveState === 'paper_scoring' && (
+        <div className="lg-waiting">
+          <p className="lg-waiting-title">Host is entering scores...</p>
+        </div>
+      )}
+
+      {/* ── ROUND RESULTS ── */}
+      {liveState === 'round_results' && (
+        <>
           {roundScores.length > 0 && (
             <section className="lg-section">
               <p className="lg-section-title">ROUND SCORES</p>
@@ -200,9 +238,7 @@ export default function LiveGame() {
               </div>
             </section>
           )}
-
-          {/* Leaderboard */}
-          {showLeaderboard && (
+          {leaderboard.length > 0 && (
             <section className="lg-section">
               <p className="lg-section-title">LEADERBOARD</p>
               <div className="lg-leaderboard">
@@ -221,18 +257,17 @@ export default function LiveGame() {
               </div>
             </section>
           )}
+          <p className="lg-results-sub">Next round starting soon...</p>
         </>
       )}
 
-      {/* ── GAME OVER ── */}
-      {gameState === 'game_over' && (
+      {/* ── LEADERBOARD ── */}
+      {liveState === 'leaderboard' && (
         <>
-          <div className="lg-gameover">
-            <h1 className="lg-gameover-heading">GAME OVER</h1>
+          <div className="lg-lb-heading-wrap">
+            <h2 className="lg-lb-heading">LEADERBOARD</h2>
           </div>
-
           <section className="lg-section">
-            <p className="lg-section-title">FINAL LEADERBOARD</p>
             <div className="lg-leaderboard">
               {leaderboard.map(entry => (
                 <div
@@ -248,33 +283,35 @@ export default function LiveGame() {
               ))}
             </div>
           </section>
+        </>
+      )}
 
-          <section className="lg-section">
-            <div className="lg-final-card">
-              <p className="lg-score-team">{d?.team?.name}</p>
-              <p className="lg-score-big">{d?.team_score?.total_score}</p>
-              {d?.team_score?.rank && (
-                <span className="lg-rank-tag">RANK #{d?.team_score?.rank}</span>
-              )}
-            </div>
-          </section>
-
-          {roundScores.length > 0 && (
+      {/* ── FINISHED ── */}
+      {liveState === 'finished' && (
+        <>
+          <div className="lg-gameover">
+            <h1 className="lg-gameover-heading">GAME OVER</h1>
+          </div>
+          {leaderboard.length > 0 && (
             <section className="lg-section">
-              <p className="lg-section-title">ROUND SCORES</p>
-              <div className="lg-round-table">
-                {[...roundScores].reverse().map(rs => (
-                  <div key={rs.round_number} className="lg-round-row">
-                    <span className="lg-round-row-name">{rs.round_name}</span>
-                    <span className="lg-round-row-score">{rs.score}</span>
+              <p className="lg-section-title">FINAL LEADERBOARD</p>
+              <div className="lg-leaderboard">
+                {leaderboard.map(entry => (
+                  <div
+                    key={entry.rank}
+                    className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
+                  >
+                    <span className="lg-lb-rank">
+                      {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
+                    </span>
+                    <span className="lg-lb-name">{entry.team_name}</span>
+                    <span className="lg-lb-score">{entry.total_score}</span>
                   </div>
                 ))}
               </div>
             </section>
           )}
-
-          <p className="lg-thanks">Thanks for playing! See you next time.</p>
-
+          <p className="lg-thanks">Thanks for playing!</p>
           <Link to="/dashboard" className="lg-dash-btn">
             Back to Dashboard
           </Link>
