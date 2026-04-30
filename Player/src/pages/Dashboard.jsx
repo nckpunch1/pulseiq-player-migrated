@@ -65,15 +65,29 @@ export default function Dashboard() {
     )
   }
 
-  const { player, team, membership, upcoming_games, pending_join_requests, leaderboard_summary } = data
+  const { player, team, membership, upcoming_games, registered_games, pending_join_requests, leaderboard_summary } = data
   const isCaptain = membership?.is_captain ?? false
   const pendingCount = isCaptain ? (pending_join_requests?.length ?? 0) : 0
   const seasonRank = leaderboard_summary?.team_current_season_rank
   const allTimeRank = leaderboard_summary?.team_all_time_rank
   const hasRanks = seasonRank != null || allTimeRank != null
 
+  const allGames = [...(upcoming_games ?? []), ...(registered_games ?? [])]
+  const liveGame = allGames.find(g => g.status === 'live')
+
   return (
     <div className="dash-page">
+
+      {/* ── Live game banner ── */}
+      {liveGame && (
+        <div className="dash-live-banner">
+          <p className="dash-live-banner-eyebrow">⚡ Your game is live</p>
+          <p className="dash-live-banner-title">{liveGame.title} at {liveGame.venue}</p>
+          <Link to={`/games/${liveGame.id}/live`} className="dash-live-banner-btn">
+            Join Now →
+          </Link>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <header className="dash-header">

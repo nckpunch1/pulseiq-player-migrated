@@ -123,6 +123,9 @@ const MOCK_LEADERBOARD = {
   ],
 }
 
+// ─── Paper live state cycle counter ──────────────────────────────────────────
+let paperLiveStateCallCount = 0
+
 // ─── Mock handlers ────────────────────────────────────────────────────────────
 
 export const mockApi = {
@@ -285,6 +288,112 @@ export const mockApi = {
 
       case 'externalPlayerGetLeaderboards':
         return { success: true, data: MOCK_LEADERBOARD }
+
+      case 'externalPlayerGetPaperLiveState': {
+        const call = ++paperLiveStateCallCount
+        const now = new Date().toISOString()
+        const base = {
+          game_id: 'game_001',
+          game_title: 'Wednesday Night Quiz',
+          venue: 'The Pig & Whistle',
+          registration_status: 'confirmed',
+          attendance_status: 'confirmed',
+        }
+        const myTeamBase = { team_id: 'team_001', team_name: 'Brick to the face' }
+
+        if (call <= 3) {
+          return {
+            success: true, data: {
+              ...base, game_state: 'scheduled',
+              my_team: { ...myTeamBase, total_score: 0, current_rank: null, current_round_score: 0 },
+              current_round: null, round_scores: [], leaderboard: [], show_leaderboard: false,
+              last_updated_at: now,
+            },
+          }
+        }
+
+        if (call <= 6) {
+          return {
+            success: true, data: {
+              ...base, game_state: 'live',
+              my_team: { ...myTeamBase, total_score: 0, current_rank: null, current_round_score: 0 },
+              current_round: {
+                number: 1, total_rounds: 6, name: 'General Knowledge',
+                description: 'A mix of everything', round_type: 'standard',
+                question_count: 10, status: 'round_active',
+              },
+              round_scores: [], leaderboard: [], show_leaderboard: false,
+              last_updated_at: now,
+            },
+          }
+        }
+
+        const leaderboard5 = [
+          { rank: 1, team_name: 'Danger Noodles', total_score: 10, is_my_team: false },
+          { rank: 2, team_name: 'Brick to the face', total_score: 8, is_my_team: true },
+          { rank: 3, team_name: 'Team Chaos', total_score: 7, is_my_team: false },
+          { rank: 4, team_name: 'Quizzy Rascals', total_score: 6, is_my_team: false },
+          { rank: 5, team_name: 'Brain Drains', total_score: 4, is_my_team: false },
+        ]
+        const round1Score = [{ round_number: 1, round_name: 'General Knowledge', score: 8 }]
+
+        if (call <= 9) {
+          return {
+            success: true, data: {
+              ...base, game_state: 'live',
+              my_team: { ...myTeamBase, total_score: 8, current_rank: 2, current_round_score: 8 },
+              current_round: {
+                number: 1, total_rounds: 6, name: 'General Knowledge',
+                description: 'A mix of everything', round_type: 'standard',
+                question_count: 10, status: 'round_results',
+              },
+              round_scores: round1Score, leaderboard: leaderboard5, show_leaderboard: true,
+              last_updated_at: now,
+            },
+          }
+        }
+
+        if (call <= 12) {
+          return {
+            success: true, data: {
+              ...base, game_state: 'live',
+              my_team: { ...myTeamBase, total_score: 8, current_rank: 2, current_round_score: 0 },
+              current_round: {
+                number: 2, total_rounds: 6, name: 'Science & Nature',
+                description: 'From atoms to ecosystems', round_type: 'standard',
+                question_count: 10, status: 'round_active',
+              },
+              round_scores: round1Score, leaderboard: [], show_leaderboard: false,
+              last_updated_at: now,
+            },
+          }
+        }
+
+        return {
+          success: true, data: {
+            ...base, game_state: 'completed',
+            my_team: { ...myTeamBase, total_score: 52, current_rank: 2, current_round_score: 0 },
+            current_round: null,
+            round_scores: [
+              { round_number: 1, round_name: 'General Knowledge', score: 8 },
+              { round_number: 2, round_name: 'Science & Nature', score: 9 },
+              { round_number: 3, round_name: 'History', score: 7 },
+              { round_number: 4, round_name: 'Music', score: 10 },
+              { round_number: 5, round_name: 'Sport', score: 9 },
+              { round_number: 6, round_name: 'Pot Luck', score: 9 },
+            ],
+            leaderboard: [
+              { rank: 1, team_name: 'Danger Noodles', total_score: 55, is_my_team: false },
+              { rank: 2, team_name: 'Brick to the face', total_score: 52, is_my_team: true },
+              { rank: 3, team_name: 'Team Chaos', total_score: 48, is_my_team: false },
+              { rank: 4, team_name: 'Quizzy Rascals', total_score: 45, is_my_team: false },
+              { rank: 5, team_name: 'Brain Drains', total_score: 38, is_my_team: false },
+            ],
+            show_leaderboard: true,
+            last_updated_at: now,
+          },
+        }
+      }
 
       default:
         return { success: false, error: { code: 'UNKNOWN_ENDPOINT', message: `Mock: no handler for ${endpoint}` } }

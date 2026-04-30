@@ -182,6 +182,13 @@ export default function GameDetail() {
         </div>
       </section>
 
+      {/* ── Open Live Game ── */}
+      {isRegistered && (game.status === 'live' || game.game_state === 'live') && (
+        <Link to={`/games/${canonicalSessionId}/live`} className="gd-open-live-btn">
+          ⚡ Open Live Game →
+        </Link>
+      )}
+
       {/* ── Registration ── */}
       <section className="gd-section">
         <p className="gd-section-title">Registration</p>
