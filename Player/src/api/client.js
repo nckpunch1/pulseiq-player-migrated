@@ -155,7 +155,12 @@ export const api = {
   getGameDetails: (gameId) => apiPost('externalPlayerGetGameDetails', { game_id: gameId }),
   registerForGame: (gameId, teamSize) => apiPost('externalPlayerRegisterTeamForGame', { game_id: gameId, team_size: teamSize }),
   confirmAttendance: (gameId, confirmedTeamSize) => apiPost('externalPlayerConfirmAttendance', { game_id: gameId, confirmed_team_size: confirmedTeamSize }),
-  getPaperLiveState: (gameId) => apiPost('externalPlayerGetPaperLiveState', { game_id: gameId }),
+  getPaperLiveState: (gameId) => {
+    if (import.meta.env.DEV) {
+      console.log('[API URL]', `${import.meta.env.VITE_BASE44_API_BASE_URL}/externalPlayerGetPaperLiveState`)
+    }
+    return apiPost('externalPlayerGetPaperLiveState', { game_id: gameId })
+  },
 
   // Leaderboard
   getLeaderboards: () => apiPost('externalPlayerGetLeaderboards'),
