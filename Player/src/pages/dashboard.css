@@ -383,6 +383,61 @@
   border: 1px solid #5a5a5c;
 }
 
+.dash-badge--confirmed {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.dash-badge--attendance {
+  background: rgba(96, 165, 250, 0.08);
+  color: #93c5fd;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.dash-badge--completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+.dash-badge--live {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dash-badge--live::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Past game cards ───────────────────────────────────────────────────────── */
+
+.dash-game-card--past {
+  opacity: 0.85;
+}
+
+.dash-view-results {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f59e0b;
+  letter-spacing: 0.02em;
+  margin-top: 8px;
+}
+
 /* ── Empty / error / loading states ───────────────────────────────────────── */
 
 .dash-empty {

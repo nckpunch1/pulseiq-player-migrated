@@ -18,10 +18,12 @@ function formatGameDate(val) {
   return `${date} · ${time.toLowerCase()}`
 }
 
-function StatusBadge({ status }) {
-  if (status === 'registered')          return <span className="g-badge g-badge--registered">Registered</span>
-  if (status === 'attendance_requested') return <span className="g-badge g-badge--attendance">Confirm Attendance</span>
-  if (status === 'confirmed')           return <span className="g-badge g-badge--confirmed">Confirmed</span>
+function GameBadge({ gameStatus, registrationStatus }) {
+  if (gameStatus === 'live')      return <span className="g-badge g-badge--live">Live</span>
+  if (gameStatus === 'completed') return <span className="g-badge g-badge--completed">Completed</span>
+  if (registrationStatus === 'confirmed')            return <span className="g-badge g-badge--confirmed">Confirmed</span>
+  if (registrationStatus === 'attendance_requested') return <span className="g-badge g-badge--attendance">Confirm Attendance</span>
+  if (registrationStatus === 'registered')           return <span className="g-badge g-badge--registered">Registered</span>
   return <span className="g-badge g-badge--open">Not Registered</span>
 }
 
@@ -57,6 +59,9 @@ export default function Games() {
     )
   }
 
+  const upcomingGames = games.filter(g => g.status === 'scheduled' || g.status === 'live')
+  const pastGames = games.filter(g => g.status === 'completed')
+
   return (
     <div className="games-page">
 
@@ -66,11 +71,11 @@ export default function Games() {
         <h1 className="games-page-title">Upcoming Games</h1>
       </header>
 
-      {games.length === 0 ? (
+      {upcomingGames.length === 0 ? (
         <p className="games-empty">No upcoming games scheduled.</p>
       ) : (
         <div className="games-list">
-          {games.map(game => (
+          {upcomingGames.map(game => (
             <Link
               key={game.canonical_session_id}
               to={`/games/${game.canonical_session_id}`}
@@ -78,7 +83,7 @@ export default function Games() {
             >
               <div className="games-card-top">
                 <span className="games-card-title">{game.title}</span>
-                <StatusBadge status={game.registration_status} />
+                <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
               </div>
               <p className="games-card-venue">{game.venue}</p>
               <p className="games-card-date">{formatGameDate(game.starts_at)}</p>
@@ -90,6 +95,32 @@ export default function Games() {
             </Link>
           ))}
         </div>
+      )}
+
+      {pastGames.length > 0 && (
+        <>
+          <p className="games-section-title">Past Games</p>
+          <div className="games-list">
+            {pastGames.map(game => (
+              <Link
+                key={game.canonical_session_id}
+                to={`/games/${game.canonical_session_id}`}
+                className="games-card games-card--past"
+              >
+                <div className="games-card-top">
+                  <span className="games-card-title">{game.title}</span>
+                  <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
+                </div>
+                <p className="games-card-venue">{game.venue}</p>
+                <p className="games-card-date">{formatGameDate(game.starts_at)}</p>
+                <div className="games-card-footer">
+                  {game.team_name && <span className="games-card-team">Team: {game.team_name}</span>}
+                  <span className="games-card-results-link">View Results →</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
 
     </div>

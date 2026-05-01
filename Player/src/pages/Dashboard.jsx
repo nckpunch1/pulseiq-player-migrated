@@ -10,10 +10,12 @@ function formatGameDate(isoString) {
   return `${date} · ${time.toLowerCase()}`
 }
 
-function RegistrationBadge({ status }) {
-  if (status === 'registered')          return <span className="dash-badge dash-badge--registered">Registered</span>
+function RegistrationBadge({ status, gameStatus }) {
+  if (gameStatus === 'live')      return <span className="dash-badge dash-badge--live">Live</span>
+  if (gameStatus === 'completed') return <span className="dash-badge dash-badge--completed">Completed</span>
+  if (status === 'registered')           return <span className="dash-badge dash-badge--registered">Registered</span>
   if (status === 'attendance_requested') return <span className="dash-badge dash-badge--attendance">Confirm Attendance</span>
-  if (status === 'confirmed')           return <span className="dash-badge dash-badge--confirmed">Confirmed</span>
+  if (status === 'confirmed')            return <span className="dash-badge dash-badge--confirmed">Confirmed</span>
   return <span className="dash-badge dash-badge--not-registered">Not Registered</span>
 }
 
@@ -74,6 +76,19 @@ export default function Dashboard() {
 
   const allGames = [...(upcoming_games ?? []), ...(registered_games ?? [])]
   const liveGame = allGames.find(g => g.status === 'live')
+
+  const rawUpcoming = upcoming_games ?? []
+  const pastGamesFromApi = data.past_games ?? null
+  let upcomingToShow, pastToShow
+  if (pastGamesFromApi !== null) {
+    upcomingToShow = rawUpcoming
+    pastToShow = pastGamesFromApi.slice(0, 2)
+  } else {
+    upcomingToShow = rawUpcoming.filter(g => !(g.registration_status === 'confirmed' && g.status === 'completed'))
+    pastToShow = rawUpcoming
+      .filter(g => g.registration_status === 'confirmed' && g.status === 'completed')
+      .slice(0, 2)
+  }
 
   return (
     <div className="dash-page">
@@ -160,13 +175,13 @@ export default function Dashboard() {
       {/* ── Upcoming games ── */}
       <section className="dash-section">
         <p className="dash-section-title">Upcoming Games</p>
-        {upcoming_games?.length ? (
+        {upcomingToShow.length ? (
           <div className="dash-games-list">
-            {upcoming_games.map(game => (
+            {upcomingToShow.map(game => (
               <Link key={game.id} to={`/games/${game.id}`} className="dash-game-card">
                 <div className="dash-game-top">
                   <span className="dash-game-title">{game.title}</span>
-                  <RegistrationBadge status={game.registration_status} />
+                  <RegistrationBadge status={game.registration_status} gameStatus={game.status} />
                 </div>
                 <p className="dash-game-venue">{game.venue}</p>
                 <p className="dash-game-date">{formatGameDate(game.starts_at)}</p>
@@ -177,6 +192,26 @@ export default function Dashboard() {
           <p className="dash-empty">No upcoming games scheduled.</p>
         )}
       </section>
+
+      {/* ── Recent Results ── */}
+      {pastToShow.length > 0 && (
+        <section className="dash-section">
+          <p className="dash-section-title">Recent Results</p>
+          <div className="dash-games-list">
+            {pastToShow.map(game => (
+              <Link key={game.id} to={`/games/${game.id}`} className="dash-game-card dash-game-card--past">
+                <div className="dash-game-top">
+                  <span className="dash-game-title">{game.title}</span>
+                  <RegistrationBadge status={game.registration_status} gameStatus={game.status} />
+                </div>
+                <p className="dash-game-venue">{game.venue}</p>
+                <p className="dash-game-date">{formatGameDate(game.starts_at)}</p>
+                <span className="dash-view-results">View Results →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
     </div>
   )

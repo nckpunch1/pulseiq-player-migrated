@@ -189,6 +189,23 @@
   border: 1px solid #5a5a5c;
 }
 
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+.g-badge--confirmed {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.g-badge--completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
 /* Live badge with pulsing dot */
 .g-badge--live {
   background: rgba(249, 115, 22, 0.15);
@@ -205,6 +222,30 @@
   background: #f97316;
   flex-shrink: 0;
   animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Past games ────────────────────────────────────────────────────────────── */
+
+.games-section-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4cfc6;
+  margin: 24px 0 12px;
+}
+
+.games-card--past {
+  opacity: 0.8;
+}
+
+.games-card-results-link {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f59e0b;
+  letter-spacing: 0.02em;
+  margin-left: auto;
 }
 
 /* ── Empty state ───────────────────────────────────────────────────────────── */
