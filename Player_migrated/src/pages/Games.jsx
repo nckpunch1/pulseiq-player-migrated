@@ -69,25 +69,37 @@ export default function Games() {
         <p className="games-empty">No upcoming games scheduled.</p>
       ) : (
         <div className="games-list">
-          {upcomingGames.map(game => (
-            <Link
-              key={game.canonical_session_id}
-              to={`/games/${game.canonical_session_id}`}
-              className="games-card"
-            >
-              <div className="games-card-top">
-                <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
-                <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
+          {upcomingGames.map(game => {
+            const isLiveCheckedIn = game.status === 'live' && game.registration_status === 'checked_in'
+            return (
+              <div key={game.canonical_session_id} className="games-card-wrap">
+                <Link
+                  to={`/games/${game.canonical_session_id}`}
+                  className="games-card"
+                >
+                  <div className="games-card-top">
+                    <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
+                    <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
+                  </div>
+                  <p className="games-card-venue">{game.venue}</p>
+                  <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
+                  {game.team_name && (
+                    <div className="games-card-footer">
+                      <span className="games-card-team">Team: {game.team_name}</span>
+                    </div>
+                  )}
+                </Link>
+                {isLiveCheckedIn && (
+                  <Link
+                    to={`/games/${game.canonical_session_id}/live`}
+                    className="games-enter-live-btn"
+                  >
+                    ⚡ Enter Live Game
+                  </Link>
+                )}
               </div>
-              <p className="games-card-venue">{game.venue}</p>
-              <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
-              {game.team_name && (
-                <div className="games-card-footer">
-                  <span className="games-card-team">Team: {game.team_name}</span>
-                </div>
-              )}
-            </Link>
-          ))}
+            )
+          })}
         </div>
       )}
 
