@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   updateProfile,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  signOut,
 } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, firestore } from '../lib/firebase'
@@ -13,6 +14,7 @@ import './profile.css'
 
 export default function Profile() {
   const { player, setSessionFromResponse } = useAuth()
+  const navigate = useNavigate()
 
   const [displayName, setDisplayName] = useState(player?.display_name ?? '')
   const [nameSuccess, setNameSuccess] = useState('')
@@ -84,6 +86,11 @@ export default function Profile() {
     } finally {
       setSavingPw(false)
     }
+  }
+
+  async function handleSignOut() {
+    await signOut(auth)
+    navigate('/')
   }
 
   const email = auth.currentUser?.email ?? player?.email ?? null
@@ -179,6 +186,12 @@ export default function Profile() {
               {savingPw ? 'Updating…' : 'Change Password'}
             </button>
           </form>
+        </section>
+
+        <section className="profile-section profile-section--signout">
+          <button type="button" className="profile-btn profile-btn--danger" onClick={handleSignOut}>
+            Sign Out
+          </button>
         </section>
 
       </div>

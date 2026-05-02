@@ -177,6 +177,26 @@
   cursor: not-allowed;
 }
 
+.profile-btn--danger {
+  background: transparent;
+  border: 1.5px solid #ef4444;
+  color: #ef4444;
+}
+
+.profile-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  box-shadow: none;
+}
+
+.profile-btn--danger:active:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  box-shadow: none;
+}
+
+.profile-section--signout {
+  margin-top: 8px;
+}
+
 /* ── Feedback messages ──────────────────────────────────────────────────────── */
 
 .profile-success {

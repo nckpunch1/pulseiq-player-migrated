@@ -77,17 +77,8 @@ export default function Dashboard() {
   const allGames = [...(upcoming_games ?? []), ...(registered_games ?? [])]
   const liveGame = allGames.find(g => g.status === 'live')
 
-  const rawUpcoming = upcoming_games ?? []
-  const pastGamesFromApi = data.past_games ?? null
   const isComplete = g => g.status === 'complete' || g.status === 'completed'
-  let upcomingToShow, pastToShow
-  if (pastGamesFromApi !== null) {
-    upcomingToShow = rawUpcoming.filter(g => !isComplete(g))
-    pastToShow = pastGamesFromApi.slice(0, 2)
-  } else {
-    upcomingToShow = rawUpcoming.filter(g => !isComplete(g))
-    pastToShow = rawUpcoming.filter(isComplete).slice(0, 2)
-  }
+  const upcomingToShow = (upcoming_games ?? []).filter(g => !isComplete(g))
 
   return (
     <div className="dash-page">
@@ -192,25 +183,6 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* ── Recent Results ── */}
-      {pastToShow.length > 0 && (
-        <section className="dash-section">
-          <p className="dash-section-title">Recent Results</p>
-          <div className="dash-games-list">
-            {pastToShow.map(game => (
-              <Link key={game.id} to={`/games/${game.id}`} className="dash-game-card dash-game-card--past">
-                <div className="dash-game-top">
-                  <span className="dash-game-title">{game.title}</span>
-                  <RegistrationBadge status={game.registration_status} gameStatus={game.status} />
-                </div>
-                <p className="dash-game-venue">{game.venue}</p>
-                <p className="dash-game-date">{formatGameDate(game.starts_at)}</p>
-                <span className="dash-view-results">View Results →</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
     </div>
   )
