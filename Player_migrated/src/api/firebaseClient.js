@@ -596,16 +596,33 @@ export async function getGameDetails(sessionId) {
       is_scribe: myMemberData.role === 'scribe' || myMemberData.role === 'captain',
     }
 
-    const regQuery = query(
-      collection(firestore, 'sessions', sessionId, 'registrations'),
-      where('teamId', '==', teamId),
-    )
-    const regSnap = await getDocs(regQuery)
-    if (!regSnap.empty) {
-      const regDoc = regSnap.docs[0]
-      const reg = regDoc.data()
+    // Primary: direct doc lookup — teamId from user doc is the source of truth
+    const regDocRef = doc(firestore, 'sessions', sessionId, 'registrations', teamId)
+    let regDocSnap = await getDoc(regDocRef)
+    let foundRegDoc = null
+
+    if (regDocSnap.exists()) {
+      foundRegDoc = regDocSnap
+      // Auto-correct corrupted registration where teamId field differs from doc ID
+      if (regDocSnap.data().teamId !== teamId) {
+        await updateDoc(regDocRef, { teamId })
+      }
+    } else if (teamData.name) {
+      // Fallback: locate by team name in case doc was written under a wrong ID
+      const fallbackSnap = await getDocs(
+        query(
+          collection(firestore, 'sessions', sessionId, 'registrations'),
+          where('teamName', '==', teamData.name),
+          limit(1),
+        ),
+      )
+      if (!fallbackSnap.empty) foundRegDoc = fallbackSnap.docs[0]
+    }
+
+    if (foundRegDoc) {
+      const reg = foundRegDoc.data()
       registration = {
-        id: regDoc.id,
+        id: foundRegDoc.id,
         session_id: sessionId,
         game_id: sessionId,
         team_id: teamId,
@@ -648,7 +665,8 @@ export async function getGameDetails(sessionId) {
 
 export async function registerForGame(sessionId, teamSize) {
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
+  const userSnap = await getDoc(doc(firestore, 'users', user.uid))
+  const teamId = userSnap.exists() ? (userSnap.data().teamId ?? null) : null
   if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
 
   const teamSnap = await getDoc(doc(firestore, 'teams', teamId))
