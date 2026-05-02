@@ -79,6 +79,14 @@ function tsToIso(val) {
   return val
 }
 
+function mapAttendanceStatus(attendanceStatus) {
+  if (attendanceStatus === 'checked_in') return 'checked_in'
+  if (attendanceStatus === 'no_show') return 'no_show'
+  if (attendanceStatus === 'confirmed') return 'confirmed'
+  if (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') return 'confirmation_requested'
+  return 'registered'
+}
+
 async function getVenueName(venueId) {
   if (!venueId) return ''
   try {
@@ -214,15 +222,13 @@ export async function dashboard() {
       upcoming_games.push({
         id: sessDoc.id,
         canonical_session_id: sessDoc.id,
+        name: sessData.name ?? '',
         title: sessData.title,
         venue: sessData.venue,
+        date: sessData.date ?? sessData.startsAt,
         starts_at: tsToIso(sessData.startsAt),
         status: sessData.status,
-        registration_status: regData
-          ? (regData.attendanceStatus === 'confirmed' ? 'confirmed'
-            : regData.attendanceStatus === 'attendance_requested' ? 'attendance_requested'
-            : 'registered')
-          : 'not_registered',
+        registration_status: regData ? mapAttendanceStatus(regData.attendanceStatus) : 'not_registered',
         team_name: regData ? team.name : null,
       })
     }
@@ -267,8 +273,10 @@ export async function dashboard() {
       upcoming_games.push({
         id: d.id,
         canonical_session_id: d.id,
+        name: data.name ?? '',
         title: data.title,
         venue: data.venue,
+        date: data.date ?? data.startsAt,
         starts_at: tsToIso(data.startsAt),
         status: data.status,
         registration_status: 'not_registered',
@@ -524,10 +532,7 @@ export async function getGames() {
         const regSnap = await getDoc(doc(firestore, 'sessions', d.id, 'registrations', teamId))
         if (regSnap.exists()) {
           const reg = regSnap.data()
-          registrationStatus =
-            reg.attendanceStatus === 'confirmed' ? 'confirmed'
-            : reg.attendanceStatus === 'attendance_requested' ? 'attendance_requested'
-            : 'registered'
+          registrationStatus = mapAttendanceStatus(reg.attendanceStatus)
           teamName = reg.teamName ?? null
         }
       }
@@ -538,8 +543,10 @@ export async function getGames() {
         id: d.id,
         canonical_session_id: d.id,
         game_id: d.id,
+        name: data.name ?? '',
         title: data.title,
         venue: venueName,
+        date: data.date ?? data.startsAt,
         starts_at: tsToIso(data.startsAt),
         status: data.status,
         registration_status: registrationStatus,
@@ -595,10 +602,11 @@ export async function getGameDetails(sessionId) {
         expected_team_size: reg.teamSize ?? null,
         confirmed_team_size: reg.confirmedTeamSize ?? null,
         attendance_status: reg.attendanceStatus ?? 'not_requested',
+        registration_status: mapAttendanceStatus(reg.attendanceStatus),
         status: 'registered',
       }
       canConfirmAttendance =
-        reg.attendanceStatus === 'attendance_requested' &&
+        (reg.attendanceStatus === 'confirmation_requested' || reg.attendanceStatus === 'attendance_requested') &&
         sessionData.status !== 'completed'
     } else {
       canRegister = sessionData.status === 'open' || sessionData.status === 'scheduled'
@@ -609,8 +617,10 @@ export async function getGameDetails(sessionId) {
 
   return {
     game: {
+      name: sessionData.name ?? '',
       title: sessionData.title,
       venue: venueName,
+      date: sessionData.date ?? sessionData.startsAt,
       starts_at: tsToIso(sessionData.startsAt),
       game_id: sessionId,
       status: sessionData.status,
@@ -669,9 +679,22 @@ export async function confirmAttendance(sessionId, confirmedTeamSize) {
   return {
     registration: {
       attendance_status: 'confirmed',
+      registration_status: 'confirmed',
       confirmed_team_size: confirmedTeamSize,
     },
   }
+}
+
+export async function cancelRegistration(sessionId) {
+  const user = requireUser()
+  const teamId = await getTeamId(user.uid)
+  if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
+
+  await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
+    attendanceStatus: 'cancelled',
+  })
+
+  return { success: true }
 }
 
 // ─── Live game ────────────────────────────────────────────────────────────────

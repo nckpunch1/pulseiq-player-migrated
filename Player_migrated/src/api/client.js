@@ -24,6 +24,7 @@ import {
   getGameDetails,
   registerForGame,
   confirmAttendance,
+  cancelRegistration,
   getPaperLiveState,
   getLeaderboards,
 } from './firebaseClient'
@@ -52,6 +53,7 @@ export const api = {
   getGameDetails: (sessionId) => getGameDetails(sessionId),
   registerForGame: (sessionId, teamSize) => registerForGame(sessionId, teamSize),
   confirmAttendance: (sessionId, confirmedTeamSize) => confirmAttendance(sessionId, confirmedTeamSize),
+  cancelRegistration: (sessionId) => cancelRegistration(sessionId),
   getPaperLiveState: (sessionId, onData) => getPaperLiveState(sessionId, onData),
 
   // Leaderboard
