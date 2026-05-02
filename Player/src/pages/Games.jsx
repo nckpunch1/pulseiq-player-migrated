@@ -59,8 +59,8 @@ export default function Games() {
     )
   }
 
-  const upcomingGames = games.filter(g => g.status === 'scheduled' || g.status === 'live')
-  const pastGames = games.filter(g => g.status === 'completed')
+  const upcomingGames = games.filter(g => g.status === 'open' || g.status === 'scheduled' || g.status === 'live')
+  const pastGames = games.filter(g => g.status === 'complete' || g.status === 'completed')
 
   return (
     <div className="games-page">

@@ -79,15 +79,14 @@ export default function Dashboard() {
 
   const rawUpcoming = upcoming_games ?? []
   const pastGamesFromApi = data.past_games ?? null
+  const isComplete = g => g.status === 'complete' || g.status === 'completed'
   let upcomingToShow, pastToShow
   if (pastGamesFromApi !== null) {
-    upcomingToShow = rawUpcoming
+    upcomingToShow = rawUpcoming.filter(g => !isComplete(g))
     pastToShow = pastGamesFromApi.slice(0, 2)
   } else {
-    upcomingToShow = rawUpcoming.filter(g => !(g.registration_status === 'confirmed' && g.status === 'completed'))
-    pastToShow = rawUpcoming
-      .filter(g => g.registration_status === 'confirmed' && g.status === 'completed')
-      .slice(0, 2)
+    upcomingToShow = rawUpcoming.filter(g => !isComplete(g))
+    pastToShow = rawUpcoming.filter(isComplete).slice(0, 2)
   }
 
   return (

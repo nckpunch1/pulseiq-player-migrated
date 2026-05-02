@@ -8,6 +8,7 @@ import Games       from './pages/Games.jsx'
 import GameDetail    from './pages/GameDetail.jsx'
 import LiveGame      from './pages/LiveGame.jsx'
 import Leaderboard  from './pages/Leaderboard.jsx'
+import Profile      from './pages/Profile.jsx'
 import BottomNav        from './components/BottomNav.jsx'
 import MiniGameOverlay  from './components/MiniGameOverlay.jsx'
 
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/games/:id"  element={<GameDetail />} />
             <Route path="/games/:gameId/live" element={<LiveGame />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/profile"    element={<Profile />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

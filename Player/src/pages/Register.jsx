@@ -81,9 +81,9 @@ export default function Register() {
                   id="reg-firstName"
                   name="firstName"
                   type="text"
-                  autoComplete="given-name"
+                  autoComplete="off"
                   className={`auth-input${errors.firstName ? ' auth-input--error' : ''}`}
-                  placeholder="Nick"
+                  placeholder="First name"
                   value={fields.firstName}
                   onChange={handleChange}
                 />
@@ -96,9 +96,9 @@ export default function Register() {
                   id="reg-lastName"
                   name="lastName"
                   type="text"
-                  autoComplete="family-name"
+                  autoComplete="off"
                   className={`auth-input${errors.lastName ? ' auth-input--error' : ''}`}
-                  placeholder="Panchuk"
+                  placeholder="Last name"
                   value={fields.lastName}
                   onChange={handleChange}
                 />
@@ -112,12 +112,12 @@ export default function Register() {
                 id="reg-username"
                 name="username"
                 type="text"
-                autoComplete="username"
+                autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck="false"
                 className={`auth-input${errors.username ? ' auth-input--error' : ''}`}
-                placeholder="nickp"
+                placeholder="Choose a username"
                 value={fields.username}
                 onChange={handleChange}
               />
