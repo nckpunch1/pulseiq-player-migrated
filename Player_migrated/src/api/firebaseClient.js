@@ -217,8 +217,12 @@ export async function dashboard() {
     // Registration status per session
     for (const sessDoc of sessSnap.docs) {
       const sessData = sessDoc.data()
-      const regSnap = await getDoc(doc(firestore, 'sessions', sessDoc.id, 'registrations', teamId))
-      const regData = regSnap.exists() ? regSnap.data() : null
+      const regQuery = query(
+        collection(firestore, 'sessions', sessDoc.id, 'registrations'),
+        where('teamId', '==', teamId),
+      )
+      const regSnap = await getDocs(regQuery)
+      const regData = regSnap.empty ? null : regSnap.docs[0].data()
       upcoming_games.push({
         id: sessDoc.id,
         canonical_session_id: sessDoc.id,
@@ -592,11 +596,16 @@ export async function getGameDetails(sessionId) {
       is_scribe: myMemberData.role === 'scribe' || myMemberData.role === 'captain',
     }
 
-    const regSnap = await getDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId))
-    if (regSnap.exists()) {
-      const reg = regSnap.data()
+    const regQuery = query(
+      collection(firestore, 'sessions', sessionId, 'registrations'),
+      where('teamId', '==', teamId),
+    )
+    const regSnap = await getDocs(regQuery)
+    if (!regSnap.empty) {
+      const regDoc = regSnap.docs[0]
+      const reg = regDoc.data()
       registration = {
-        id: regSnap.id,
+        id: regDoc.id,
         session_id: sessionId,
         game_id: sessionId,
         team_id: teamId,

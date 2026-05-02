@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
+import { api } from '../api/client'
 import './live-game.css'
 
 function formatSecondsAgo(secs) {
@@ -46,8 +47,19 @@ export default function LiveGame() {
     isReconnecting,
     lastUpdatedAt,
     consecutiveFailures,
-    loading,
+    loading: rtdbLoading,
   } = usePaperLiveGame(gameId)
+
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(true)
+
+  useEffect(() => {
+    if (!gameId) return
+    api.getGameDetails(gameId)
+      .then(data => setDetail(data))
+      .catch(() => {})
+      .finally(() => setDetailLoading(false))
+  }, [gameId])
 
   // Force re-render every second so "Updated X ago" stays live
   const [, setTick] = useState(0)
@@ -55,6 +67,8 @@ export default function LiveGame() {
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [])
+
+  const loading = detailLoading || rtdbLoading
 
   const d = lastKnownGoodState
   const liveState = d?.game?.live_state ?? null
@@ -90,7 +104,7 @@ export default function LiveGame() {
   }
 
   // ── No team ──────────────────────────────────────────────────────
-  if (!d?.team && !d?.registration) {
+  if (!detail?.team && !detail?.registration) {
     return (
       <div className="lg-page">
         <header className="lg-header">
@@ -111,8 +125,7 @@ export default function LiveGame() {
   }
 
   // ── Not registered ───────────────────────────────────────────────
-  const isRegistered =
-    d?.registration?.registration_status === 'confirmed' || d?.registration?.registration_status === 'registered'
+  const isRegistered = !!detail?.registration
   if (!isRegistered) {
     return (
       <div className="lg-page">
@@ -167,7 +180,7 @@ export default function LiveGame() {
 
       {/* ── Team score card — all states except lobby ── */}
       {!isLobby && (
-        <TeamScoreCard team={d?.team} teamScore={d?.team_score} />
+        <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.team_score} />
       )}
 
       {/* ── ROUND INTRO ── */}
@@ -245,7 +258,7 @@ export default function LiveGame() {
                 {leaderboard.map(entry => (
                   <div
                     key={entry.rank}
-                    className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
+                    className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
                   >
                     <span className="lg-lb-rank">
                       {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
@@ -272,7 +285,7 @@ export default function LiveGame() {
               {leaderboard.map(entry => (
                 <div
                   key={entry.rank}
-                  className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
+                  className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
                 >
                   <span className="lg-lb-rank">
                     {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
@@ -299,7 +312,7 @@ export default function LiveGame() {
                 {leaderboard.map(entry => (
                   <div
                     key={entry.rank}
-                    className={`lg-lb-row${entry.team_id === d?.team?.id ? ' lg-lb-row--mine' : ''}`}
+                    className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
                   >
                     <span className="lg-lb-rank">
                       {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
