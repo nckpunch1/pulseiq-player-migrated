@@ -71,7 +71,7 @@ export default function LiveGame() {
   const loading = detailLoading || rtdbLoading
 
   const d = lastKnownGoodState
-  const liveState = d?.game?.live_state ?? null
+  const liveState = d?.status ?? null
   const gameStatus = d?.game?.status
   const currentRound = d?.current_round
   const leaderboard = d?.leaderboard ?? []
