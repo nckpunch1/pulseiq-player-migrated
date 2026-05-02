@@ -3,15 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './games.css'
 
-function parseDate(val) {
-  if (!val) return null
-  if (typeof val === 'string') return new Date(val)
-  if (val < 9999999999) return new Date(val * 1000)
-  return new Date(val)
-}
-
-function formatGameDate(val) {
-  const d = parseDate(val)
+function formatGameDate(d) {
   if (!d) return ''
   const date = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
   const time = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -21,9 +13,11 @@ function formatGameDate(val) {
 function GameBadge({ gameStatus, registrationStatus }) {
   if (gameStatus === 'live')      return <span className="g-badge g-badge--live">Live</span>
   if (gameStatus === 'completed') return <span className="g-badge g-badge--completed">Completed</span>
-  if (registrationStatus === 'confirmed')            return <span className="g-badge g-badge--confirmed">Confirmed</span>
-  if (registrationStatus === 'attendance_requested') return <span className="g-badge g-badge--attendance">Confirm Attendance</span>
-  if (registrationStatus === 'registered')           return <span className="g-badge g-badge--registered">Registered</span>
+  if (registrationStatus === 'checked_in')             return <span className="g-badge g-badge--checked-in">Checked In</span>
+  if (registrationStatus === 'confirmed')              return <span className="g-badge g-badge--confirmed">Confirmed</span>
+  if (registrationStatus === 'confirmation_requested') return <span className="g-badge g-badge--confirmation-requested">Confirmation Requested</span>
+  if (registrationStatus === 'registered')             return <span className="g-badge g-badge--registered">Registered</span>
+  if (registrationStatus === 'no_show')                return <span className="g-badge g-badge--no-show">Did Not Attend</span>
   return <span className="g-badge g-badge--open">Not Registered</span>
 }
 
@@ -82,11 +76,11 @@ export default function Games() {
               className="games-card"
             >
               <div className="games-card-top">
-                <span className="games-card-title">{game.title}</span>
+                <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
                 <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
               </div>
               <p className="games-card-venue">{game.venue}</p>
-              <p className="games-card-date">{formatGameDate(game.starts_at)}</p>
+              <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
               {game.team_name && (
                 <div className="games-card-footer">
                   <span className="games-card-team">Team: {game.team_name}</span>
@@ -108,11 +102,11 @@ export default function Games() {
                 className="games-card games-card--past"
               >
                 <div className="games-card-top">
-                  <span className="games-card-title">{game.title}</span>
+                  <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
                   <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
                 </div>
                 <p className="games-card-venue">{game.venue}</p>
-                <p className="games-card-date">{formatGameDate(game.starts_at)}</p>
+                <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
                 <div className="games-card-footer">
                   {game.team_name && <span className="games-card-team">Team: {game.team_name}</span>}
                   <span className="games-card-results-link">View Results →</span>

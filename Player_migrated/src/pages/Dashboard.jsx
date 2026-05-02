@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './dashboard.css'
 
-function formatGameDate(isoString) {
-  const d = new Date(isoString)
+function formatGameDate(d) {
+  if (!d) return ''
   const date = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
   const time = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
   return `${date} · ${time.toLowerCase()}`
@@ -13,9 +13,11 @@ function formatGameDate(isoString) {
 function RegistrationBadge({ status, gameStatus }) {
   if (gameStatus === 'live')      return <span className="dash-badge dash-badge--live">Live</span>
   if (gameStatus === 'completed') return <span className="dash-badge dash-badge--completed">Completed</span>
-  if (status === 'registered')           return <span className="dash-badge dash-badge--registered">Registered</span>
-  if (status === 'attendance_requested') return <span className="dash-badge dash-badge--attendance">Confirm Attendance</span>
-  if (status === 'confirmed')            return <span className="dash-badge dash-badge--confirmed">Confirmed</span>
+  if (status === 'checked_in')             return <span className="dash-badge dash-badge--checked-in">Checked In</span>
+  if (status === 'confirmed')              return <span className="dash-badge dash-badge--confirmed">Confirmed</span>
+  if (status === 'confirmation_requested') return <span className="dash-badge dash-badge--confirmation-requested">Confirmation Requested</span>
+  if (status === 'registered')             return <span className="dash-badge dash-badge--registered">Registered</span>
+  if (status === 'no_show')                return <span className="dash-badge dash-badge--no-show">Did Not Attend</span>
   return <span className="dash-badge dash-badge--not-registered">Not Registered</span>
 }
 
@@ -75,7 +77,7 @@ export default function Dashboard() {
   const hasRanks = seasonRank != null || allTimeRank != null
 
   const allGames = [...(upcoming_games ?? []), ...(registered_games ?? [])]
-  const liveGame = allGames.find(g => g.status === 'live')
+  const liveGame = allGames.find(g => g.status === 'live' && g.registration_status === 'checked_in')
 
   const isComplete = g => g.status === 'complete' || g.status === 'completed'
   const upcomingToShow = (upcoming_games ?? []).filter(g => !isComplete(g))
@@ -87,7 +89,7 @@ export default function Dashboard() {
       {liveGame && (
         <div className="dash-live-banner">
           <p className="dash-live-banner-eyebrow">⚡ Your game is live</p>
-          <p className="dash-live-banner-title">{liveGame.title} at {liveGame.venue}</p>
+          <p className="dash-live-banner-title">{liveGame.name || 'Upcoming Game'} at {liveGame.venue}</p>
           <Link to={`/games/${liveGame.id}/live`} className="dash-live-banner-btn">
             Join Now →
           </Link>
@@ -170,11 +172,11 @@ export default function Dashboard() {
             {upcomingToShow.map(game => (
               <Link key={game.id} to={`/games/${game.id}`} className="dash-game-card">
                 <div className="dash-game-top">
-                  <span className="dash-game-title">{game.title}</span>
+                  <span className="dash-game-title">{game.name || 'Upcoming Game'}</span>
                   <RegistrationBadge status={game.registration_status} gameStatus={game.status} />
                 </div>
                 <p className="dash-game-venue">{game.venue}</p>
-                <p className="dash-game-date">{formatGameDate(game.starts_at)}</p>
+                <p className="dash-game-date">{formatGameDate(game.date?.toDate?.())}</p>
               </Link>
             ))}
           </div>

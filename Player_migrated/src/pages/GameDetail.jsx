@@ -3,19 +3,21 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import './game-detail.css'
 
-function parseDate(val) {
-  if (!val) return null
-  if (typeof val === 'string') return new Date(val)
-  if (val < 9999999999) return new Date(val * 1000)
-  return new Date(val)
-}
-
-function formatGameDate(val) {
-  const d = parseDate(val)
+function formatGameDate(d) {
   if (!d) return ''
   const date = d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const time = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
   return `${date} at ${time.toLowerCase()}`
+}
+
+function RegistrationStatusBadge({ registrationStatus }) {
+  if (!registrationStatus) return null
+  if (registrationStatus === 'checked_in')             return <span className="gd-badge gd-badge--checked-in">Checked In</span>
+  if (registrationStatus === 'confirmed')              return <span className="gd-badge gd-badge--confirmed">Confirmed</span>
+  if (registrationStatus === 'confirmation_requested') return <span className="gd-badge gd-badge--confirmation-requested">Confirmation Requested</span>
+  if (registrationStatus === 'registered')             return <span className="gd-badge gd-badge--registered">Registered</span>
+  if (registrationStatus === 'no_show')                return <span className="gd-badge gd-badge--no-show">Did Not Attend</span>
+  return null
 }
 
 function SizePicker({ value, onChange, disabled }) {
@@ -74,13 +76,6 @@ export default function GameDetail() {
         setDetail(data)
         const initialSize = data.registration?.expected_team_size ?? data.registration?.confirmed_team_size
         if (initialSize) setTeamSize(initialSize)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[game detail fields]', {
-            can_confirm_attendance: data?.can_confirm_attendance,
-            attendance_status: data?.registration?.attendance_status,
-            isCaptain: data?.is_captain,
-          })
-        }
       } catch (err) {
         setPageError(err.message ?? 'Failed to load game.')
       } finally {
@@ -124,6 +119,25 @@ export default function GameDetail() {
     }
   }
 
+  async function handleCancelRegistration() {
+    setActionBusy(true)
+    setActionError('')
+    try {
+      await api.cancelRegistration(detail.game.game_id)
+      const gameStatus = detail?.game?.status
+      setDetail(prev => ({
+        ...prev,
+        registration: null,
+        can_confirm_attendance: false,
+        can_register: gameStatus === 'open' || gameStatus === 'scheduled',
+      }))
+    } catch (err) {
+      setActionError(err.message ?? 'Failed to cancel registration. Please try again.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -151,10 +165,12 @@ export default function GameDetail() {
   const isCaptain = detail?.is_captain === true
   const canRegister = detail?.can_register === true
   const registration = detail?.registration
-  const attendanceStatus = detail?.registration?.attendance_status
+  const attendanceStatus = registration?.attendance_status
+  const registrationStatus = registration?.registration_status ?? null
   const hasTeam = !!team
   const isRegistered = !!registration
   const attendanceConfirmed = attendanceStatus === 'confirmed'
+  const isCheckedIn = attendanceStatus === 'checked_in'
   const showConfirmAttendance = canConfirmAttendance
 
   return (
@@ -164,7 +180,7 @@ export default function GameDetail() {
       <header className="gd-header">
         <Link to="/games" className="gd-back">← Games</Link>
         <p className="gd-wordmark">QuizPulse</p>
-        <h1 className="gd-page-title">{game.title}</h1>
+        <h1 className="gd-page-title">{game.name || 'Upcoming Game'}</h1>
       </header>
 
       {/* ── Venue & date ── */}
@@ -177,13 +193,13 @@ export default function GameDetail() {
           <div className="gd-meta-divider" />
           <div className="gd-meta-item">
             <span className="gd-meta-label">Date &amp; Time</span>
-            <span className="gd-meta-value">{formatGameDate(game.starts_at)}</span>
+            <span className="gd-meta-value">{formatGameDate(game.date?.toDate?.())}</span>
           </div>
         </div>
       </section>
 
-      {/* ── Open Live Game ── */}
-      {isRegistered && (game.status === 'live' || game.game_state === 'live') && (
+      {/* ── Open Live Game — only for checked-in teams ── */}
+      {isCheckedIn && (game.status === 'live' || game.game_state === 'live') && (
         <Link to={`/games/${canonicalSessionId}/live`} className="gd-open-live-btn">
           ⚡ Open Live Game →
         </Link>
@@ -191,7 +207,10 @@ export default function GameDetail() {
 
       {/* ── Registration ── */}
       <section className="gd-section">
-        <p className="gd-section-title">Registration</p>
+        <div className="gd-section-header">
+          <p className="gd-section-title">Registration</p>
+          {registrationStatus && <RegistrationStatusBadge registrationStatus={registrationStatus} />}
+        </div>
 
         {/* No team */}
         {!hasTeam && (
@@ -232,7 +251,7 @@ export default function GameDetail() {
                 Registered as <strong>{registration.team_name}</strong>
               </p>
             )}
-            <p className="gd-action-prompt">Confirm how many players will attend.</p>
+            <p className="gd-action-prompt">Please confirm your team&apos;s attendance.</p>
             <SizePicker value={teamSize} onChange={setTeamSize} disabled={actionBusy} />
             <button
               className="gd-btn gd-btn--primary"
@@ -240,6 +259,13 @@ export default function GameDetail() {
               disabled={actionBusy}
             >
               {actionBusy ? 'Confirming…' : 'Confirm Attendance'}
+            </button>
+            <button
+              className="gd-btn gd-btn--ghost"
+              onClick={handleCancelRegistration}
+              disabled={actionBusy}
+            >
+              {actionBusy ? 'Cancelling…' : 'Cancel Registration'}
             </button>
           </div>
         )}
@@ -268,17 +294,19 @@ export default function GameDetail() {
                     Attendance confirmed · {registration.confirmed_team_size}{' '}
                     {registration.confirmed_team_size === 1 ? 'player' : 'players'}
                   </span>
+                ) : isCheckedIn ? (
+                  <span className="gd-status-sub">Checked in</span>
                 ) : (
                   <span className="gd-status-sub">
                     Registered · attendance confirmation pending
                   </span>
                 )}
               </div>
-              {attendanceConfirmed && (
-                <span className="gd-badge gd-badge--confirmed">Confirmed</span>
+              {(attendanceConfirmed || isCheckedIn) && (
+                <RegistrationStatusBadge registrationStatus={registrationStatus} />
               )}
             </div>
-            {!isCaptain && !attendanceConfirmed && (
+            {!isCaptain && !attendanceConfirmed && !isCheckedIn && (
               <p className="gd-readonly-note">Your captain will confirm attendance.</p>
             )}
           </div>
@@ -293,11 +321,11 @@ export default function GameDetail() {
           </div>
         )}
 
-        {/* Game is live */}
-        {game.status === 'live' && isRegistered && (
+        {/* Game is live — show waiting message for non-checked-in teams */}
+        {game.status === 'live' && isRegistered && !isCheckedIn && (
           <div className="gd-card gd-card--live">
             <p className="gd-live-text">
-              Game is live — your host will open the game shortly.
+              Game is live — your host will check you in shortly.
             </p>
           </div>
         )}
