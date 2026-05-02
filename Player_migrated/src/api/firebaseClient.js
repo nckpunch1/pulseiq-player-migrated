@@ -529,9 +529,11 @@ export async function getGames() {
       let teamName = null
 
       if (teamId) {
-        const regSnap = await getDoc(doc(firestore, 'sessions', d.id, 'registrations', teamId))
-        if (regSnap.exists()) {
-          const reg = regSnap.data()
+        const regSnap = await getDocs(
+          query(collection(firestore, 'sessions', d.id, 'registrations'), where('teamId', '==', teamId), limit(1)),
+        )
+        if (!regSnap.empty) {
+          const reg = regSnap.docs[0].data()
           registrationStatus = mapAttendanceStatus(reg.attendanceStatus)
           teamName = reg.teamName ?? null
         }
