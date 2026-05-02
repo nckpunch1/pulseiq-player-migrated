@@ -30,7 +30,7 @@ function TeamScoreCard({ team, teamScore }) {
     <section className="lg-section">
       <div className="lg-score-card">
         <p className="lg-score-team">{team?.name}</p>
-        <p className="lg-score-big">{teamScore?.total_score ?? 0}</p>
+        <p className="lg-score-big">{teamScore?.score ?? 0}</p>
         {teamScore?.rank && (
           <span className="lg-rank-tag">RANK #{teamScore.rank}</span>
         )}
@@ -72,9 +72,23 @@ export default function LiveGame() {
 
   const d = lastKnownGoodState
   const liveState = d?.status ?? null
-  const gameStatus = d?.game?.status
-  const currentRound = d?.current_round
-  const leaderboard = d?.leaderboard ?? []
+  const STATUS_BADGE_MAP = {
+    lobby: 'live',
+    paper_round_active: 'live',
+    round_results: 'live',
+    round_results_revealed: 'live',
+    game_complete: 'completed',
+  }
+  const gameStatus = STATUS_BADGE_MAP[d?.status] ?? 'live'
+  const currentRound = d?.currentRound
+  const teamId = detail?.team?.id ?? d?.team?.id
+  const leaderboardRaw = d?.leaderboard
+  const leaderboard = leaderboardRaw && !Array.isArray(leaderboardRaw)
+    ? Object.entries(leaderboardRaw)
+        .map(([id, data]) => ({ teamId: id, ...data }))
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .map((entry, i) => ({ ...entry, rank: entry.rank ?? i + 1 }))
+    : (Array.isArray(leaderboardRaw) ? leaderboardRaw : [])
   const roundScores = d?.round_scores ?? []
 
   const isLobby = !liveState || liveState === 'lobby'
@@ -180,7 +194,7 @@ export default function LiveGame() {
 
       {/* ── Team score card — all states except lobby ── */}
       {!isLobby && (
-        <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.team_score} />
+        <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
       )}
 
       {/* ── ROUND INTRO ── */}
@@ -189,7 +203,7 @@ export default function LiveGame() {
           <div className="lg-round-card">
             {currentRound ? (
               <>
-                <p className="lg-round-label">ROUND {currentRound.round_number}</p>
+                <p className="lg-round-label">ROUND {currentRound.number}</p>
                 <h2 className="lg-round-name">{currentRound.title}</h2>
                 <p className="lg-round-intro-sub">Get ready — round starting soon</p>
                 {currentRound.question_count && (
@@ -209,8 +223,11 @@ export default function LiveGame() {
           <div className="lg-round-card">
             {currentRound ? (
               <>
-                <p className="lg-round-label">ROUND {currentRound.round_number}</p>
+                <p className="lg-round-label">ROUND {currentRound.number}</p>
                 <h2 className="lg-round-name">{currentRound.title}</h2>
+                {currentRound.description && (
+                  <p className="lg-round-desc">{currentRound.description}</p>
+                )}
                 <p className="lg-round-active-sub">Round in progress — write your answers</p>
                 <div className="lg-round-meta">
                   {currentRound.question_count && (
@@ -257,14 +274,42 @@ export default function LiveGame() {
               <div className="lg-leaderboard">
                 {leaderboard.map(entry => (
                   <div
-                    key={entry.rank}
-                    className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
+                    key={entry.teamId}
+                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
                   >
                     <span className="lg-lb-rank">
                       {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
                     </span>
-                    <span className="lg-lb-name">{entry.team_name}</span>
-                    <span className="lg-lb-score">{entry.total_score}</span>
+                    <span className="lg-lb-name">{entry.teamName}</span>
+                    <span className="lg-lb-score">{entry.score}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          <p className="lg-results-sub">Next round starting soon...</p>
+        </>
+      )}
+
+      {/* ── ROUND RESULTS REVEALED ── */}
+      {liveState === 'round_results_revealed' && (
+        <>
+          <div className="lg-lb-heading-wrap">
+            <h2 className="lg-lb-heading">LEADERBOARD</h2>
+          </div>
+          {leaderboard.length > 0 && (
+            <section className="lg-section">
+              <div className="lg-leaderboard">
+                {leaderboard.map(entry => (
+                  <div
+                    key={entry.teamId}
+                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
+                  >
+                    <span className="lg-lb-rank">
+                      {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
+                    </span>
+                    <span className="lg-lb-name">{entry.teamName}</span>
+                    <span className="lg-lb-score">{entry.score}</span>
                   </div>
                 ))}
               </div>
@@ -284,14 +329,14 @@ export default function LiveGame() {
             <div className="lg-leaderboard">
               {leaderboard.map(entry => (
                 <div
-                  key={entry.rank}
-                  className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
+                  key={entry.teamId}
+                  className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
                 >
                   <span className="lg-lb-rank">
                     {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
                   </span>
-                  <span className="lg-lb-name">{entry.team_name}</span>
-                  <span className="lg-lb-score">{entry.total_score}</span>
+                  <span className="lg-lb-name">{entry.teamName}</span>
+                  <span className="lg-lb-score">{entry.score}</span>
                 </div>
               ))}
             </div>
@@ -311,14 +356,14 @@ export default function LiveGame() {
               <div className="lg-leaderboard">
                 {leaderboard.map(entry => (
                   <div
-                    key={entry.rank}
-                    className={`lg-lb-row${entry.team_id === (detail?.team?.id ?? d?.team?.id) ? ' lg-lb-row--mine' : ''}`}
+                    key={entry.teamId}
+                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
                   >
                     <span className="lg-lb-rank">
                       {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
                     </span>
-                    <span className="lg-lb-name">{entry.team_name}</span>
-                    <span className="lg-lb-score">{entry.total_score}</span>
+                    <span className="lg-lb-name">{entry.teamName}</span>
+                    <span className="lg-lb-score">{entry.score}</span>
                   </div>
                 ))}
               </div>
