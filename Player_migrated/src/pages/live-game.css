@@ -1,0 +1,513 @@
+/* ── Page shell ──────────────────────────────────────────────────────────── */
+.lg-page {
+  flex: 1 1 auto;
+  background: #111008;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  min-height: 100svh;
+}
+
+/* ── Header (sticky) ─────────────────────────────────────────────────────── */
+.lg-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #111008;
+  border-bottom: 1px solid #2a2a20;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lg-back {
+  color: #f59e0b;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lg-header-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.lg-game-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.lg-game-venue {
+  font-size: 0.72rem;
+  color: #9a9590;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 1px 0 0;
+}
+
+/* ── State badge ─────────────────────────────────────────────────────────── */
+.lg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lg-badge--live {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.lg-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.lg-badge--scheduled {
+  background: rgba(154, 149, 144, 0.1);
+  color: #9a9590;
+  border: 1px solid rgba(154, 149, 144, 0.18);
+}
+
+.lg-badge--completed {
+  background: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+/* ── Reconnection bar ────────────────────────────────────────────────────── */
+.lg-reconnect-bar {
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.22);
+  color: #f59e0b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 9px 16px;
+  text-align: center;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+.lg-section {
+  padding: 0 16px;
+  margin-top: 16px;
+}
+
+.lg-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a9590;
+  margin: 0 0 8px;
+}
+
+/* ── Waiting state ───────────────────────────────────────────────────────── */
+.lg-waiting {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 20px;
+  gap: 12px;
+  text-align: center;
+}
+
+.lg-waiting-icon {
+  font-size: 3.5rem;
+  line-height: 1;
+  color: #f59e0b;
+}
+
+.lg-waiting-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.lg-waiting-sub {
+  font-size: 0.85rem;
+  color: #9a9590;
+  margin: 0;
+}
+
+/* ── Round card ──────────────────────────────────────────────────────────── */
+.lg-round-card {
+  background: #1c1c14;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.lg-round-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #f59e0b;
+  margin: 0 0 6px;
+}
+
+.lg-round-name {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+  line-height: 1.05;
+}
+
+.lg-round-desc {
+  font-size: 0.85rem;
+  color: #9a9590;
+  margin: 0 0 12px;
+}
+
+.lg-round-qtag {
+  display: inline-block;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+}
+
+.lg-round-waiting {
+  font-size: 1rem;
+  color: #9a9590;
+  margin: 0;
+  padding: 4px 0;
+}
+
+/* ── My team score card ──────────────────────────────────────────────────── */
+.lg-score-card {
+  background: #1c1c14;
+  border: 1px solid #2a2a20;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+
+.lg-score-team {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #d4cfc6;
+  letter-spacing: 0.04em;
+  margin: 0 0 2px;
+}
+
+.lg-score-big {
+  font-size: 5rem;
+  font-weight: 900;
+  color: #f59e0b;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 4px 0 10px;
+}
+
+.lg-rank-tag {
+  display: inline-block;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+}
+
+.lg-round-score-sub {
+  font-size: 0.82rem;
+  color: #9a9590;
+  margin: 8px 0 0;
+}
+
+/* ── Round-by-round table ────────────────────────────────────────────────── */
+.lg-round-table {
+  background: #1c1c14;
+  border: 1px solid #2a2a20;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lg-round-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid #222218;
+}
+
+.lg-round-row:last-child {
+  border-bottom: none;
+}
+
+.lg-round-row-name {
+  font-size: 0.9rem;
+  color: #d4cfc6;
+}
+
+.lg-round-row-score {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #f5f0e8;
+}
+
+/* ── Leaderboard ─────────────────────────────────────────────────────────── */
+.lg-leaderboard {
+  background: #1c1c14;
+  border: 1px solid #2a2a20;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lg-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #222218;
+}
+
+.lg-lb-row:last-child {
+  border-bottom: none;
+}
+
+.lg-lb-row--mine {
+  background: rgba(245, 158, 11, 0.09);
+}
+
+.lg-lb-rank {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #9a9590;
+  min-width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lg-lb-row--mine .lg-lb-rank {
+  color: #f59e0b;
+}
+
+.lg-lb-name {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f5f0e8;
+}
+
+.lg-lb-row--mine .lg-lb-name {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+.lg-lb-score {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  min-width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.lg-lb-row--mine .lg-lb-score {
+  color: #f59e0b;
+}
+
+/* ── Game over ───────────────────────────────────────────────────────────── */
+.lg-gameover {
+  padding: 36px 16px 16px;
+  text-align: center;
+}
+
+.lg-gameover-heading {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #f5f0e8;
+  margin: 0;
+}
+
+.lg-final-card {
+  background: #1c1c14;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.lg-thanks {
+  font-size: 0.88rem;
+  color: #9a9590;
+  text-align: center;
+  padding: 20px 16px 4px;
+  margin: 0;
+}
+
+/* ── Back to dashboard button ────────────────────────────────────────────── */
+.lg-dash-btn {
+  display: block;
+  text-decoration: none;
+  text-align: center;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #f59e0b;
+  color: #111008;
+  border-radius: 12px;
+  padding: 14px 24px;
+  margin: 12px 16px 0;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.lg-dash-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.lg-dash-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.97);
+}
+
+/* ── Info card (no-team / not-registered) ────────────────────────────────── */
+.lg-info-card {
+  background: #1c1c14;
+  border: 1px solid #2a2a20;
+  border-radius: 12px;
+  padding: 20px;
+  color: #d4cfc6;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.lg-state-fill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  min-height: 40svh;
+}
+
+/* ── Updated at ──────────────────────────────────────────────────────────── */
+.lg-updated-at {
+  font-size: 0.68rem;
+  color: #9a9590;
+  text-align: center;
+  padding: 20px 16px 8px;
+  margin: auto 0 0;
+}
+
+/* ── Round intro / active subtitles ─────────────────────────────────────── */
+.lg-round-intro-sub {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f59e0b;
+  margin: 8px 0 12px;
+}
+
+.lg-round-active-sub {
+  font-size: 0.9rem;
+  color: #d4cfc6;
+  margin: 8px 0 12px;
+}
+
+.lg-round-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Round results subtitle ──────────────────────────────────────────────── */
+.lg-results-sub {
+  font-size: 0.85rem;
+  color: #9a9590;
+  text-align: center;
+  padding: 20px 16px 4px;
+  margin: 0;
+}
+
+/* ── Leaderboard state heading ───────────────────────────────────────────── */
+.lg-lb-heading-wrap {
+  padding: 32px 16px 8px;
+  text-align: center;
+}
+
+.lg-lb-heading {
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #f59e0b;
+  margin: 0;
+}
+
+/* ── Loading skeletons ───────────────────────────────────────────────────── */
+@keyframes lg-skel-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.7;  }
+}
+
+.lg-skel {
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 8px;
+  animation: lg-skel-pulse 1.5s ease-in-out infinite;
+}
+
+.lg-skel--title {
+  height: 14px;
+  width: 55%;
+}
+
+.lg-skel--sub {
+  height: 11px;
+  width: 38%;
+  margin-top: 5px;
+}
+
+.lg-skel-stack {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lg-skel--card {
+  height: 128px;
+  border-radius: 16px;
+}
+
+.lg-skel--card-sm {
+  height: 80px;
+  border-radius: 16px;
+}

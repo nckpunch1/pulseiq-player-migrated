@@ -1,0 +1,269 @@
+/* ── Full-screen overlay ────────────────────────────────────────────────────── */
+
+.mgov {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: #1c1c1e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 24px env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+}
+
+/* ── Centered content column ────────────────────────────────────────────────── */
+
+.mgov-content {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+}
+
+/* ── Team label ─────────────────────────────────────────────────────────────── */
+
+.mgov-team-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  margin: 0 0 10px;
+}
+
+/* ── Mode label ─────────────────────────────────────────────────────────────── */
+
+.mgov-mode-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a9590;
+  margin: 0 0 24px;
+}
+
+/* ── Question text ──────────────────────────────────────────────────────────── */
+
+.mgov-question {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  line-height: 1.25;
+  margin: 0 0 32px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Heading (Watch the big screen / Check the big screen) ──────────────────── */
+
+.mgov-heading {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  margin: 0 0 12px;
+}
+
+/* ── Sub text ───────────────────────────────────────────────────────────────── */
+
+.mgov-sub {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #9a9590;
+  margin: 0;
+}
+
+/* ── Captain note (non-captain closest answer) ──────────────────────────────── */
+
+.mgov-captain-note {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #d4cfc6;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ── Pulse animation wrapper ────────────────────────────────────────────────── */
+
+.mgov-pulse-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin: 4px auto 28px;
+  flex-shrink: 0;
+}
+
+/* Pulsing rings (coral for passive, gold for result) */
+
+.mgov-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #f97316;
+  animation: mgov-ring-out 2s ease-out infinite;
+}
+
+.mgov-ring--gold {
+  border-color: #f59e0b;
+}
+
+.mgov-ring--delay {
+  animation-delay: 1s;
+}
+
+/* Inner dot */
+
+.mgov-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f97316;
+  animation: mgov-dot-beat 2s ease-in-out infinite;
+}
+
+.mgov-dot--gold {
+  background: #f59e0b;
+}
+
+@keyframes mgov-ring-out {
+  0%   { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes mgov-dot-beat {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+  50%       { transform: translate(-50%, -50%) scale(0.75); opacity: 0.6; }
+}
+
+/* ── Closest Answer form ────────────────────────────────────────────────────── */
+
+.mgov-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mgov-number-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #3a3a3c;
+  border: 2px solid #5a5a5c;
+  border-radius: 16px;
+  padding: 20px 16px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #f5f0e8;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -moz-appearance: textfield;
+}
+
+.mgov-number-input::-webkit-outer-spin-button,
+.mgov-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.mgov-number-input::placeholder {
+  color: #5a5a5c;
+}
+
+.mgov-number-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+}
+
+.mgov-number-input:disabled {
+  opacity: 0.5;
+}
+
+/* ── Submit button ──────────────────────────────────────────────────────────── */
+
+.mgov-btn {
+  width: 100%;
+  padding: 18px 24px;
+  border-radius: 16px;
+  border: none;
+  background: #f59e0b;
+  color: #1c1c1e;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.mgov-btn:hover:not(:disabled) {
+  background: #fbbf24;
+  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.35);
+}
+
+.mgov-btn:active:not(:disabled) {
+  background: #d97706;
+}
+
+.mgov-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Locked state ───────────────────────────────────────────────────────────── */
+
+.mgov-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 0;
+}
+
+.mgov-locked-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15);
+  border: 2px solid rgba(245, 158, 11, 0.4);
+  font-size: 2rem;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+.mgov-locked-text {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+/* ── Error message ──────────────────────────────────────────────────────────── */
+
+.mgov-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #f87171;
+  line-height: 1.4;
+  margin: 0;
+}

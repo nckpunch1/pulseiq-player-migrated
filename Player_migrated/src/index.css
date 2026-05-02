@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+
+:root {
+  --bg-base: #2c2c2e;
+  --bg-surface: #3a3a3c;
+  --bg-elevated: #48484a;
+  --bg-overlay: #1c1c1e;
+  --ivory: #f5f0e8;
+  --ivory-muted: #d4cfc6;
+  --ivory-dim: #9a9590;
+  --surface-light: #e8e4dc;
+  --gold: #f59e0b;
+  --gold-light: #fbbf24;
+  --gold-dim: rgba(245, 158, 11, 0.15);
+  --gold-border: rgba(245, 158, 11, 0.3);
+  --coral: #f97316;
+  --coral-light: #fb923c;
+  --coral-dim: rgba(249, 115, 22, 0.15);
+  --blue: #60a5fa;
+  --blue-dim: rgba(96, 165, 250, 0.15);
+
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ivory);
+  background: var(--bg-base);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+}
+
+#root {
+  width: 480px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+h1, h2, h3 {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  color: var(--ivory);
+  margin: 0;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}

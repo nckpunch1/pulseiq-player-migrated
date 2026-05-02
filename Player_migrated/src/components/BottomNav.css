@@ -1,0 +1,82 @@
+/* ── Shell ─────────────────────────────────────────────────────────────────── */
+
+.bnav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  max-width: 100%;
+  display: flex;
+  align-items: stretch;
+  background: #1c1c1e;
+  border-top: 1px solid #3a3a3c;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────────── */
+
+.bnav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 60px;
+  text-decoration: none;
+  color: #9a9590;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  padding-top: 6px;
+}
+
+.bnav-tab:active {
+  opacity: 0.7;
+}
+
+.bnav-tab--active {
+  color: #f59e0b;
+}
+
+/* Gold dot indicator above active icon */
+.bnav-tab--active::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+/* ── Icon ──────────────────────────────────────────────────────────────────── */
+
+.bnav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.bnav-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Label ─────────────────────────────────────────────────────────────────── */
+
+.bnav-label {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}

@@ -1,0 +1,224 @@
+/* ── Page shell ─────────────────────────────────────────────────────────────── */
+
+.profile-page {
+  flex: 1 1 auto;
+  background: #2c2c2e;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  text-align: left;
+  padding: 0 20px calc(60px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+
+.profile-header {
+  padding: 28px 0 20px;
+  border-bottom: 1px solid #3a3a3c;
+  margin-bottom: 24px;
+}
+
+.profile-back {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f59e0b;
+  text-decoration: none;
+  margin-bottom: 14px;
+  transition: color 0.15s;
+}
+
+.profile-back:hover {
+  color: #fbbf24;
+}
+
+.profile-wordmark {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  margin: 0 0 8px;
+}
+
+.profile-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #f5f0e8;
+  margin: 0;
+  line-height: 1.05;
+}
+
+/* ── Body ───────────────────────────────────────────────────────────────────── */
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Section ────────────────────────────────────────────────────────────────── */
+
+.profile-section {
+  background: #3a3a3c;
+  border: 1px solid #48484a;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.profile-section-heading {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a9590;
+  margin: 0 0 16px;
+}
+
+/* ── Fields ─────────────────────────────────────────────────────────────────── */
+
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.profile-field-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.profile-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a9590;
+}
+
+.profile-email-value {
+  font-size: 1rem;
+  color: #f5f0e8;
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid #48484a;
+}
+
+/* ── Input ──────────────────────────────────────────────────────────────────── */
+
+.profile-input {
+  background: #48484a;
+  border: 1px solid #5a5a5c;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #f5f0e8;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.profile-input::placeholder {
+  color: #9a9590;
+}
+
+.profile-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+/* ── Button ─────────────────────────────────────────────────────────────────── */
+
+.profile-btn {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 13px 24px;
+  background: #f59e0b;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1c1c1e;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.profile-btn:hover:not(:disabled) {
+  background: #fbbf24;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+}
+
+.profile-btn:active:not(:disabled) {
+  background: #d97706;
+  box-shadow: none;
+}
+
+.profile-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.profile-btn--danger {
+  background: transparent;
+  border: 1.5px solid #ef4444;
+  color: #ef4444;
+}
+
+.profile-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  box-shadow: none;
+}
+
+.profile-btn--danger:active:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  box-shadow: none;
+}
+
+.profile-section--signout {
+  margin-top: 8px;
+}
+
+/* ── Feedback messages ──────────────────────────────────────────────────────── */
+
+.profile-success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #4ade80;
+  line-height: 1.4;
+}
+
+.profile-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #f87171;
+  line-height: 1.4;
+}

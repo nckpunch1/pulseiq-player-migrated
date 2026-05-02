@@ -1,0 +1,531 @@
+/* ── Page shell ────────────────────────────────────────────────────────────── */
+
+.dash-page {
+  flex: 1 1 auto;
+  background: #2c2c2e;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  text-align: left;
+  padding: 0 20px calc(60px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.dash-header {
+  padding: 28px 0 20px;
+  border-bottom: 1px solid #3a3a3c;
+  margin-bottom: 24px;
+}
+
+.dash-wordmark {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  margin: 0 0 14px;
+}
+
+.dash-player-name {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  margin: 0 0 4px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+.dash-username {
+  font-size: 1rem;
+  color: #9a9590;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* ── Hero card (Games CTA) ─────────────────────────────────────────────────── */
+
+.dash-hero-card {
+  display: block;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  border-radius: 16px;
+  padding: 24px 24px 20px;
+  text-decoration: none;
+  transition: filter 0.15s, transform 0.15s;
+  overflow: hidden;
+  position: relative;
+}
+
+.dash-hero-card:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.dash-hero-card:active {
+  filter: brightness(0.96);
+  transform: none;
+}
+
+.dash-hero-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(28, 28, 30, 0.65);
+  margin: 0 0 4px;
+}
+
+.dash-hero-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1c1c1e;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.dash-hero-sub {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(28, 28, 30, 0.7);
+  margin: 0;
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────────── */
+
+.dash-section {
+  margin-bottom: 24px;
+}
+
+.dash-section-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4cfc6;
+  margin: 0 0 12px;
+}
+
+/* ── Base card ─────────────────────────────────────────────────────────────── */
+
+.dash-card {
+  background: #3a3a3c;
+  border: 1px solid #48484a;
+  border-radius: 16px;
+  padding: 20px 24px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.dash-card:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
+}
+
+/* ── Team card ─────────────────────────────────────────────────────────────── */
+
+.dash-team-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dash-team-name-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dash-team-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Join-requests pill */
+.dash-requests-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  background: #48484a;
+  border: 1px solid #5a5a5c;
+  border-radius: 10px;
+  padding: 6px 12px 6px 10px;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.dash-requests-link:hover {
+  border-color: #f59e0b;
+}
+
+.dash-requests-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #d4cfc6;
+}
+
+.dash-notif-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: #f59e0b;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1c1c1e;
+  box-sizing: border-box;
+  line-height: 1;
+}
+
+/* ── No-team card ──────────────────────────────────────────────────────────── */
+
+.dash-card--no-team {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.dash-no-team-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  margin: 0 0 6px;
+}
+
+.dash-no-team-sub {
+  font-size: 1rem;
+  color: #9a9590;
+  margin: 0 0 24px;
+  font-weight: 400;
+}
+
+.dash-no-team-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dash-btn {
+  display: inline-block;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.dash-btn--primary {
+  background: #f59e0b;
+  color: #1c1c1e;
+  border: 1px solid #f59e0b;
+}
+
+.dash-btn--primary:hover {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+}
+
+.dash-btn--ghost {
+  background: #48484a;
+  color: #f5f0e8;
+  border: 1px solid #48484a;
+}
+
+.dash-btn--ghost:hover {
+  background: #5a5a5c;
+  border-color: #5a5a5c;
+}
+
+/* ── Leaderboard strip ─────────────────────────────────────────────────────── */
+
+.dash-rank-strip {
+  display: flex;
+  gap: 10px;
+}
+
+.dash-rank-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: #3a3a3c;
+  border: 1px solid #48484a;
+  border-radius: 16px;
+  padding: 16px 12px;
+}
+
+.dash-rank-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4cfc6;
+}
+
+.dash-rank-value {
+  font-size: 1.85rem;
+  font-weight: 900;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+/* ── Game cards ────────────────────────────────────────────────────────────── */
+
+.dash-games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-game-card {
+  display: block;
+  background: #3a3a3c;
+  border: 1px solid #48484a;
+  border-radius: 16px;
+  padding: 16px 20px;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.dash-game-card:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
+}
+
+.dash-game-card:active {
+  background: #48484a;
+}
+
+.dash-game-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dash-game-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  line-height: 1.2;
+}
+
+.dash-game-venue {
+  font-size: 0.9rem;
+  color: #d4cfc6;
+  margin: 0 0 6px;
+  font-weight: 400;
+}
+
+.dash-game-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #9a9590;
+  margin: 0;
+}
+
+/* ── Badges ────────────────────────────────────────────────────────────────── */
+
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dash-badge--captain {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dash-badge--registered {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dash-badge--not-registered {
+  background: #48484a;
+  color: #9a9590;
+  border: 1px solid #5a5a5c;
+}
+
+.dash-badge--confirmed {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.dash-badge--attendance {
+  background: rgba(96, 165, 250, 0.08);
+  color: #93c5fd;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.dash-badge--completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+.dash-badge--live {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dash-badge--live::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Past game cards ───────────────────────────────────────────────────────── */
+
+.dash-game-card--past {
+  opacity: 0.85;
+}
+
+.dash-view-results {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f59e0b;
+  letter-spacing: 0.02em;
+  margin-top: 8px;
+}
+
+/* ── Empty / error / loading states ───────────────────────────────────────── */
+
+.dash-empty {
+  font-size: 1rem;
+  color: #9a9590;
+  text-align: center;
+  padding: 28px 0;
+  font-weight: 400;
+}
+
+.dash-state-fill {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40svh;
+}
+
+.dash-loading-text {
+  font-size: 1rem;
+  color: #9a9590;
+  letter-spacing: 0.04em;
+}
+
+.dash-error-box {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 12px;
+  padding: 20px 24px;
+  font-size: 1rem;
+  color: #f87171;
+  text-align: center;
+  max-width: 400px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── Live game banner ──────────────────────────────────────────────────────── */
+
+.dash-live-banner {
+  margin: 0 -20px 24px;
+  background: #f59e0b;
+  padding: 18px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-live-banner-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(28, 28, 30, 0.65);
+  margin: 0;
+}
+
+.dash-live-banner-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #1c1c1e;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.dash-live-banner-btn {
+  display: inline-block;
+  background: #1c1c1e;
+  color: #f59e0b;
+  padding: 12px 32px;
+  border-radius: 10px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.dash-live-banner-btn:hover {
+  background: #2c2c2e;
+}
+
+.dash-live-banner-btn:active {
+  background: #111;
+}

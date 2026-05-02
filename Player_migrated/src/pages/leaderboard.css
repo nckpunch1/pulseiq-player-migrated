@@ -1,0 +1,268 @@
+/* ── Page shell ────────────────────────────────────────────────────────────── */
+
+.lb-page {
+  flex: 1 1 auto;
+  background: #2c2c2e;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  text-align: left;
+  padding: 0 20px calc(60px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Full-screen states ────────────────────────────────────────────────────── */
+
+.lb-state-fill {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40svh;
+}
+
+.lb-loading-text {
+  font-size: 1rem;
+  color: #9a9590;
+  letter-spacing: 0.04em;
+}
+
+.lb-error-box {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 12px;
+  padding: 20px 24px;
+  font-size: 1rem;
+  color: #f87171;
+  text-align: center;
+  max-width: 400px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.lb-header {
+  padding: 20px 0 20px;
+  border-bottom: 1px solid #3a3a3c;
+  margin-bottom: 24px;
+}
+
+.lb-back {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a9590;
+  text-decoration: none;
+  margin-bottom: 12px;
+  transition: color 0.15s;
+}
+
+.lb-back:hover {
+  color: #f59e0b;
+}
+
+.lb-wordmark {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  margin: 0 0 12px;
+}
+
+.lb-page-title {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  margin: 0 0 4px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+.lb-season-name {
+  font-size: 0.9rem;
+  color: #9a9590;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────────── */
+
+.lb-tab-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #3a3a3c;
+  padding-bottom: 0;
+}
+
+.lb-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 4px 12px;
+  margin-bottom: -1px;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a9590;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.lb-tab:hover {
+  color: #f5f0e8;
+}
+
+.lb-tab--active {
+  color: #f59e0b;
+  border-bottom-color: #f59e0b;
+}
+
+/* ── Table card ────────────────────────────────────────────────────────────── */
+
+.lb-card {
+  background: #3a3a3c;
+  border: 1px solid #48484a;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* ── Column header row ─────────────────────────────────────────────────────── */
+
+.lb-col-header {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #48484a;
+}
+
+.lb-col-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a9590;
+}
+
+.lb-col-label--right {
+  text-align: right;
+}
+
+/* ── Entry rows ────────────────────────────────────────────────────────────── */
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-left: 3px solid transparent;
+  transition: background 0.1s;
+}
+
+.lb-row--bordered {
+  border-bottom: 1px solid #48484a;
+}
+
+.lb-row--own {
+  background: rgba(245, 158, 11, 0.08);
+  border-left-color: #f59e0b;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
+
+/* ── Rank number ───────────────────────────────────────────────────────────── */
+
+.lb-rank {
+  font-size: 1.3rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-rank--gold   { color: #f59e0b; }
+.lb-rank--silver { color: #d4cfc6; }
+.lb-rank--bronze { color: #f97316; }
+.lb-rank--other  { color: #9a9590; }
+
+/* ── Team name + badge ─────────────────────────────────────────────────────── */
+
+.lb-team-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lb-team-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-team-name--own {
+  color: #f59e0b;
+}
+
+.lb-own-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Stats column ──────────────────────────────────────────────────────────── */
+
+.lb-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.lb-points {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.lb-games {
+  font-size: 0.8rem;
+  color: #9a9590;
+  font-weight: 400;
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────────── */
+
+.lb-empty {
+  font-size: 1rem;
+  color: #9a9590;
+  text-align: center;
+  padding: 36px 0;
+  font-weight: 400;
+}
