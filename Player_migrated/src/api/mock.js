@@ -2,7 +2,6 @@
  * Mock API client for development.
  * Swap to real client by setting VITE_USE_MOCK_API=false in .env.local
  *
- * All responses mirror the exact shape the real Base44 API will return.
  * Add realistic delays to simulate network latency.
  */
 
