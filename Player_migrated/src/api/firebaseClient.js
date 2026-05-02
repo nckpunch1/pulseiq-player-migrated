@@ -79,6 +79,16 @@ function tsToIso(val) {
   return val
 }
 
+async function getVenueName(venueId) {
+  if (!venueId) return ''
+  try {
+    const snap = await getDoc(doc(firestore, 'venues', venueId))
+    return snap.exists() ? (snap.data().name ?? '') : ''
+  } catch {
+    return ''
+  }
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function login({ username, password }) {
@@ -522,12 +532,14 @@ export async function getGames() {
         }
       }
 
+      const venueName = await getVenueName(data.venueId) || data.venue || ''
+
       return {
         id: d.id,
         canonical_session_id: d.id,
         game_id: d.id,
         title: data.title,
-        venue: data.venue,
+        venue: venueName,
         starts_at: tsToIso(data.startsAt),
         status: data.status,
         registration_status: registrationStatus,
@@ -593,10 +605,12 @@ export async function getGameDetails(sessionId) {
     }
   }
 
+  const venueName = await getVenueName(sessionData.venueId) || sessionData.venue || ''
+
   return {
     game: {
       title: sessionData.title,
-      venue: sessionData.venue,
+      venue: venueName,
       starts_at: tsToIso(sessionData.startsAt),
       game_id: sessionId,
       status: sessionData.status,
