@@ -42,6 +42,89 @@ function TeamScoreCard({ team, teamScore }) {
   )
 }
 
+const GAME_TYPE_LABELS = {
+  blitz: 'SUDDEN DEATH BLITZ',
+  closest_answer: 'CLOSEST ANSWER CHALLENGE',
+  beer_game: 'BEER GAME',
+  bonus_question: 'BONUS QUESTION',
+}
+
+function PulseBranding() {
+  return (
+    <div className="pulse-branding">
+      <span className="pulse-logo-icon">⚡</span>
+      <span className="pulse-logo-text">PulseIQ</span>
+    </div>
+  )
+}
+
+function PulseTapScreen({ pulseSessionId, teamId, teamName }) {
+  const [hasTapped, setHasTapped] = useState(false)
+
+  useEffect(() => {
+    setHasTapped(false)
+  }, [pulseSessionId])
+
+  async function handleTap() {
+    if (!pulseSessionId || !teamId || hasTapped) return
+    setHasTapped(true)
+    const tapRef = ref(db, `pulseSessions/${pulseSessionId}/taps/${teamId}`)
+    await set(tapRef, { teamId, teamName, tappedAt: serverTimestamp() })
+  }
+
+  return (
+    <div className="pulse-overlay pulse-overlay--fullscreen">
+      <PulseBranding />
+      <p className="pulse-team-label">{teamName}</p>
+      <button
+        className={`pulse-tap-btn${hasTapped ? ' pulse-tap-btn--tapped' : ''}`}
+        onClick={handleTap}
+        disabled={hasTapped}
+      >
+        {hasTapped ? '⚡ Tapped!' : 'TAP'}
+      </button>
+    </div>
+  )
+}
+
+function PulseRevealScreen({ pulseSession }) {
+  const { state, gameType, winnerName } = pulseSession
+  const isWinnerGame = gameType === 'beer_game' || gameType === 'bonus_question'
+  const isGameTypeReveal = gameType === 'blitz' || gameType === 'closest_answer'
+  const showWinner = state === 'revealed' && isWinnerGame && winnerName
+  const showGameType = state === 'revealed' && isGameTypeReveal
+
+  return (
+    <div className="pulse-overlay">
+      <PulseBranding />
+      {showWinner ? (
+        <div className="pulse-winner-wrap">
+          <span className="pulse-winner-trophy">🏆</span>
+          <p className="pulse-winner-label">WINNER</p>
+          <p className="pulse-winner-name">{winnerName}</p>
+        </div>
+      ) : showGameType ? (
+        <p className="pulse-reveal-game-type">{GAME_TYPE_LABELS[gameType]}</p>
+      ) : (
+        <p className="pulse-standby">Stand by...</p>
+      )}
+    </div>
+  )
+}
+
+function PulseQuestionScreen({ pulseSession }) {
+  const { gameType, currentGame } = pulseSession
+  return (
+    <div className="pulse-overlay">
+      <PulseBranding />
+      <p className="pulse-game-type-label">{GAME_TYPE_LABELS[gameType] ?? gameType}</p>
+      {currentGame?.question && (
+        <p className="pulse-question-text">{currentGame.question}</p>
+      )}
+    </div>
+  )
+}
+
 function PulseAnswerScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
   const [answer, setAnswer] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -58,108 +141,110 @@ function PulseAnswerScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
     if (isNaN(parsed)) return
     setSubmitted(true)
     const answerRef = ref(db, `pulseSessions/${pulseSessionId}/answers/${teamId}`)
-    await set(answerRef, {
-      teamId,
-      teamName,
-      answer: parsed,
-      submittedAt: serverTimestamp(),
-    })
+    await set(answerRef, { teamId, teamName, answer: parsed })
   }
-
-  const isRevealed = pulseSession?.state === 'revealed'
-  const winner = pulseSession?.winner
 
   return (
     <div className="pulse-overlay">
-      <div className="pulse-branding">
-        <span className="pulse-logo-icon">⚡</span>
-        <span className="pulse-logo-text">PulseIQ</span>
-      </div>
-
-      {isRevealed ? (
-        <div className="pulse-winner-wrap">
-          <span className="pulse-winner-trophy">🏆</span>
-          <p className="pulse-winner-label">WINNER</p>
-          <p className="pulse-winner-name">{winner?.teamName ?? 'Closest team!'}</p>
-        </div>
-      ) : submitted ? (
+      <PulseBranding />
+      <p className="pulse-game-type-label">CLOSEST ANSWER CHALLENGE</p>
+      {pulseSession.currentGame?.question && (
+        <p className="pulse-question-text">{pulseSession.currentGame.question}</p>
+      )}
+      {submitted ? (
         <p className="pulse-submitted-msg">Answer submitted!</p>
       ) : (
-        <>
-          <p className="pulse-team-label">{teamName}</p>
-          <form className="pulse-answer-form" onSubmit={handleSubmit}>
-            <input
-              className="pulse-answer-input"
-              type="number"
-              inputMode="numeric"
-              placeholder="Your answer"
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              disabled={submitted}
-              autoFocus
-            />
-            <button
-              className="pulse-answer-btn"
-              type="submit"
-              disabled={submitted || answer === ''}
-            >
-              SUBMIT
-            </button>
-          </form>
-        </>
+        <form className="pulse-answer-form" onSubmit={handleSubmit}>
+          <input
+            className="pulse-answer-input"
+            type="number"
+            inputMode="numeric"
+            placeholder="Your answer"
+            value={answer}
+            onChange={e => setAnswer(e.target.value)}
+            disabled={submitted}
+            autoFocus
+          />
+          <button
+            className="pulse-answer-btn"
+            type="submit"
+            disabled={submitted || answer === ''}
+          >
+            SUBMIT
+          </button>
+        </form>
       )}
     </div>
   )
 }
 
-function PulseTapScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
-  const [hasTapped, setHasTapped] = useState(false)
-
-  useEffect(() => {
-    setHasTapped(false)
-  }, [pulseSessionId])
-
-  async function handleTap() {
-    if (!pulseSessionId || !teamId || hasTapped) return
-    setHasTapped(true)
-    const tapRef = ref(db, `pulseSessions/${pulseSessionId}/taps/${teamId}`)
-    await set(tapRef, {
-      teamId,
-      teamName,
-      tappedAt: serverTimestamp(),
-    })
-  }
-
-  const isRevealed = pulseSession?.state === 'revealed'
-  const winner = pulseSession?.winner
+function PulseBlitzScreen({ pulseSession }) {
+  const { currentGame } = pulseSession
+  const questions = currentGame?.questions ?? []
+  const idx = currentGame?.currentQuestionIndex ?? 0
+  const q = questions[idx]
 
   return (
     <div className="pulse-overlay">
-      <div className="pulse-branding">
-        <span className="pulse-logo-icon">⚡</span>
-        <span className="pulse-logo-text">PulseIQ</span>
-      </div>
-
-      {isRevealed ? (
-        <div className="pulse-winner-wrap">
-          <span className="pulse-winner-trophy">🏆</span>
-          <p className="pulse-winner-label">WINNER</p>
-          <p className="pulse-winner-name">{winner?.teamName ?? 'Fastest team!'}</p>
-        </div>
-      ) : (
+      <PulseBranding />
+      <p className="pulse-game-type-label">SUDDEN DEATH BLITZ</p>
+      {q ? (
         <>
-          <p className="pulse-team-label">{teamName}</p>
-          <button
-            className={`pulse-tap-btn${hasTapped ? ' pulse-tap-btn--tapped' : ''}`}
-            onClick={handleTap}
-            disabled={hasTapped}
-          >
-            {hasTapped ? '⚡ Pulsed!' : 'TAP TO\nPULSE!'}
-          </button>
+          <p className="pulse-blitz-counter">Question {idx + 1} of {questions.length}</p>
+          <p className="pulse-question-text">{q.question}</p>
+          <div className="pulse-blitz-choices">
+            <div className="pulse-blitz-choice">
+              <span className="pulse-blitz-choice-label">A</span>
+              <span className="pulse-blitz-choice-text">{q.choiceA}</span>
+            </div>
+            <div className="pulse-blitz-choice">
+              <span className="pulse-blitz-choice-label">B</span>
+              <span className="pulse-blitz-choice-text">{q.choiceB}</span>
+            </div>
+          </div>
         </>
+      ) : (
+        <p className="pulse-standby">Stand by...</p>
       )}
     </div>
   )
+}
+
+function PulseOverlay({ pulseSession, pulseSessionId, teamId, teamName }) {
+  const { state, gameType } = pulseSession
+
+  if (state === 'active') {
+    return (
+      <PulseTapScreen
+        pulseSessionId={pulseSessionId}
+        teamId={teamId}
+        teamName={teamName}
+      />
+    )
+  }
+
+  if (state === 'revealing' || state === 'revealed') {
+    return <PulseRevealScreen pulseSession={pulseSession} />
+  }
+
+  if (state === 'game_active') {
+    if (gameType === 'closest_answer') {
+      return (
+        <PulseAnswerScreen
+          pulseSession={pulseSession}
+          pulseSessionId={pulseSessionId}
+          teamId={teamId}
+          teamName={teamName}
+        />
+      )
+    }
+    if (gameType === 'blitz') {
+      return <PulseBlitzScreen pulseSession={pulseSession} />
+    }
+    return <PulseQuestionScreen pulseSession={pulseSession} />
+  }
+
+  return null
 }
 
 export default function LiveGame() {
@@ -195,7 +280,9 @@ export default function LiveGame() {
   // Pulse session — must be called before any early return
   const pulseTeamId = detail?.team?.id ?? liveTeamId
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId)
-  const isPulseActive = pulseSession != null && pulseSession.state !== 'setup'
+  const isPulseActive = pulseSession != null &&
+    pulseSession.state !== 'setup' &&
+    pulseSession.state !== 'complete'
 
   const loading = detailLoading || rtdbLoading
 
@@ -313,16 +400,8 @@ export default function LiveGame() {
       )}
 
       {/* ── PULSE SESSION ACTIVE ── */}
-      {isPulseActive && pulseSession.outcomeType === 'closest_answer' && (
-        <PulseAnswerScreen
-          pulseSession={pulseSession}
-          pulseSessionId={pulseSessionId}
-          teamId={teamId}
-          teamName={detail?.team?.name ?? d?.team?.name}
-        />
-      )}
-      {isPulseActive && pulseSession.outcomeType !== 'closest_answer' && (
-        <PulseTapScreen
+      {isPulseActive && (
+        <PulseOverlay
           pulseSession={pulseSession}
           pulseSessionId={pulseSessionId}
           teamId={teamId}
