@@ -73,7 +73,7 @@ export default function LiveGame() {
   // Pulse session — must be called before any early return
   const pulseTeamId = detail?.team?.id ?? liveTeamId
   const { sessionData: pulseSession } = usePulseSession(pulseTeamId)
-  const isPulseActive = !!pulseSession && pulseSession.state !== 'setup'
+  const isPulseActive = pulseSession != null && pulseSession.state !== 'setup'
 
   const loading = detailLoading || rtdbLoading
 
