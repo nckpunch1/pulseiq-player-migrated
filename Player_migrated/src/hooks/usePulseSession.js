@@ -46,7 +46,7 @@ export function usePulseSession(teamId) {
     const sessRef = ref(db, `pulseSessions/${sessionId}`)
     const unsub = onValue(
       sessRef,
-      (snap) => setSessionData(snap.val()),
+      (snap) => setSessionData(snap.exists() ? snap.val() : null),
       (err) => {
         if (import.meta.env.DEV) console.warn('[Pulse] session error:', err.message)
       },
