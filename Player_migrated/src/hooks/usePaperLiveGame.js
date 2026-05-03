@@ -49,6 +49,7 @@ export function usePaperLiveGame(gameId) {
   return {
     liveState,
     lastKnownGoodState,
+    teamId: lastKnownGoodState?.team?.id ?? null,
     isPolling,
     isReconnecting,
     lastUpdatedAt,
