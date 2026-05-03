@@ -591,6 +591,77 @@
   100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 
+.pulse-answer-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.pulse-answer-input {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f5f0e8;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.pulse-answer-input::-webkit-outer-spin-button,
+.pulse-answer-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pulse-answer-input:focus {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.pulse-answer-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: none;
+  background: #f59e0b;
+  color: #111008;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.1s, transform 0.1s;
+}
+
+.pulse-answer-btn:active {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}
+
+.pulse-answer-btn:disabled {
+  background: rgba(245, 158, 11, 0.25);
+  color: rgba(245, 158, 11, 0.4);
+  cursor: default;
+}
+
+.pulse-submitted-msg {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f59e0b;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
 .pulse-winner-wrap {
   display: flex;
   flex-direction: column;
