@@ -42,6 +42,76 @@ function TeamScoreCard({ team, teamScore }) {
   )
 }
 
+function PulseAnswerScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
+  const [answer, setAnswer] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    setAnswer('')
+    setSubmitted(false)
+  }, [pulseSessionId])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!pulseSessionId || !teamId || submitted || answer === '') return
+    const parsed = Number(answer)
+    if (isNaN(parsed)) return
+    setSubmitted(true)
+    const answerRef = ref(db, `pulseSessions/${pulseSessionId}/answers/${teamId}`)
+    await set(answerRef, {
+      teamId,
+      teamName,
+      answer: parsed,
+      submittedAt: serverTimestamp(),
+    })
+  }
+
+  const isRevealed = pulseSession?.state === 'revealed'
+  const winner = pulseSession?.winner
+
+  return (
+    <div className="pulse-overlay">
+      <div className="pulse-branding">
+        <span className="pulse-logo-icon">⚡</span>
+        <span className="pulse-logo-text">PulseIQ</span>
+      </div>
+
+      {isRevealed ? (
+        <div className="pulse-winner-wrap">
+          <span className="pulse-winner-trophy">🏆</span>
+          <p className="pulse-winner-label">WINNER</p>
+          <p className="pulse-winner-name">{winner?.teamName ?? 'Closest team!'}</p>
+        </div>
+      ) : submitted ? (
+        <p className="pulse-submitted-msg">Answer submitted!</p>
+      ) : (
+        <>
+          <p className="pulse-team-label">{teamName}</p>
+          <form className="pulse-answer-form" onSubmit={handleSubmit}>
+            <input
+              className="pulse-answer-input"
+              type="number"
+              inputMode="numeric"
+              placeholder="Your answer"
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              disabled={submitted}
+              autoFocus
+            />
+            <button
+              className="pulse-answer-btn"
+              type="submit"
+              disabled={submitted || answer === ''}
+            >
+              SUBMIT
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PulseTapScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
   const [hasTapped, setHasTapped] = useState(false)
 
@@ -243,7 +313,15 @@ export default function LiveGame() {
       )}
 
       {/* ── PULSE SESSION ACTIVE ── */}
-      {isPulseActive && (
+      {isPulseActive && pulseSession.outcomeType === 'closest_answer' && (
+        <PulseAnswerScreen
+          pulseSession={pulseSession}
+          pulseSessionId={pulseSessionId}
+          teamId={teamId}
+          teamName={detail?.team?.name ?? d?.team?.name}
+        />
+      )}
+      {isPulseActive && pulseSession.outcomeType !== 'closest_answer' && (
         <PulseTapScreen
           pulseSession={pulseSession}
           pulseSessionId={pulseSessionId}
