@@ -553,20 +553,19 @@
 }
 
 .pulse-tap-btn {
-  width: 180px;
-  height: 180px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
   border: none;
   background: #f59e0b;
   color: #111008;
   font-family: 'Barlow Condensed', system-ui, sans-serif;
-  font-size: 1.4rem;
+  font-size: 2.4rem;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  white-space: pre-line;
   cursor: pointer;
-  animation: pulse-tap-ring 1.8s ease-out infinite;
+  animation: pulse-tap-ring 1.6s ease-out infinite;
   transition: transform 0.1s, filter 0.1s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -689,4 +688,109 @@
   letter-spacing: -0.01em;
   line-height: 1.1;
   margin: 0;
+}
+
+/* ── Full-screen tap overlay (state: active) ─────────────────────────────── */
+.pulse-overlay--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.14) 0%, #111008 60%);
+  padding: env(safe-area-inset-top, 0) 24px env(safe-area-inset-bottom, 0);
+}
+
+/* ── Stand by (revealing with no winner yet) ─────────────────────────────── */
+.pulse-standby {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #9a9590;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0;
+  animation: pulse-standby-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-standby-blink {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Game type reveal (blitz / closest_answer) ───────────────────────────── */
+.pulse-reveal-game-type {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f59e0b;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+  margin: 0;
+  max-width: 320px;
+}
+
+/* ── Game type label (small, above question) ─────────────────────────────── */
+.pulse-game-type-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  margin: 0;
+}
+
+/* ── Question text ───────────────────────────────────────────────────────── */
+.pulse-question-text {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  line-height: 1.4;
+  text-align: center;
+  margin: 0;
+  max-width: 340px;
+}
+
+/* ── Blitz question counter ──────────────────────────────────────────────── */
+.pulse-blitz-counter {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #9a9590;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* ── Blitz choice cards ──────────────────────────────────────────────────── */
+.pulse-blitz-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+
+.pulse-blitz-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1c1c14;
+  border: 1px solid #2a2a20;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.pulse-blitz-choice-label {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #f59e0b;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.pulse-blitz-choice-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f5f0e8;
+  line-height: 1.3;
 }
