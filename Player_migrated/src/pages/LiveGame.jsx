@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
+import { usePulseSession } from '../hooks/usePulseSession'
 import { api } from '../api/client'
 import './live-game.css'
 
@@ -44,6 +45,7 @@ export default function LiveGame() {
 
   const {
     lastKnownGoodState,
+    teamId: liveTeamId,
     isReconnecting,
     lastUpdatedAt,
     consecutiveFailures,
@@ -67,6 +69,11 @@ export default function LiveGame() {
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Pulse session — must be called before any early return
+  const pulseTeamId = detail?.team?.id ?? liveTeamId
+  const { sessionData: pulseSession } = usePulseSession(pulseTeamId)
+  const isPulseActive = !!pulseSession && pulseSession.state !== 'setup'
 
   const loading = detailLoading || rtdbLoading
 
@@ -183,8 +190,17 @@ export default function LiveGame() {
         </div>
       )}
 
+      {/* ── PULSE SESSION ACTIVE ── */}
+      {isPulseActive && (
+        <div className="lg-waiting">
+          <span className="lg-waiting-icon">⚡</span>
+          <p className="lg-waiting-title">Pulse session in progress</p>
+          <p className="lg-waiting-sub">This screen updates automatically</p>
+        </div>
+      )}
+
       {/* ── LOBBY / null ── */}
-      {isLobby && (
+      {!isPulseActive && isLobby && (
         <div className="lg-waiting">
           <span className="lg-waiting-icon">⚡</span>
           <p className="lg-waiting-title">Waiting for host to start the game</p>
@@ -193,12 +209,12 @@ export default function LiveGame() {
       )}
 
       {/* ── Team score card — all states except lobby ── */}
-      {!isLobby && (
+      {!isPulseActive && !isLobby && (
         <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
       )}
 
       {/* ── ROUND INTRO ── */}
-      {liveState === 'round_intro' && (
+      {!isPulseActive && liveState === 'round_intro' && (
         <section className="lg-section">
           <div className="lg-round-card">
             {currentRound ? (
@@ -218,7 +234,7 @@ export default function LiveGame() {
       )}
 
       {/* ── PAPER ROUND ACTIVE ── */}
-      {liveState === 'paper_round_active' && (
+      {!isPulseActive && liveState === 'paper_round_active' && (
         <section className="lg-section">
           <div className="lg-round-card">
             {currentRound ? (
@@ -246,14 +262,14 @@ export default function LiveGame() {
       )}
 
       {/* ── PAPER SCORING ── */}
-      {liveState === 'paper_scoring' && (
+      {!isPulseActive && liveState === 'paper_scoring' && (
         <div className="lg-waiting">
           <p className="lg-waiting-title">Host is entering scores...</p>
         </div>
       )}
 
       {/* ── ROUND RESULTS ── */}
-      {liveState === 'round_results' && (
+      {!isPulseActive && liveState === 'round_results' && (
         <>
           {roundScores.length > 0 && (
             <section className="lg-section">
@@ -292,7 +308,7 @@ export default function LiveGame() {
       )}
 
       {/* ── ROUND RESULTS REVEALED ── */}
-      {liveState === 'round_results_revealed' && (
+      {!isPulseActive && liveState === 'round_results_revealed' && (
         <>
           <div className="lg-lb-heading-wrap">
             <h2 className="lg-lb-heading">LEADERBOARD</h2>
@@ -320,7 +336,7 @@ export default function LiveGame() {
       )}
 
       {/* ── LEADERBOARD ── */}
-      {liveState === 'leaderboard' && (
+      {!isPulseActive && liveState === 'leaderboard' && (
         <>
           <div className="lg-lb-heading-wrap">
             <h2 className="lg-lb-heading">LEADERBOARD</h2>
@@ -345,7 +361,7 @@ export default function LiveGame() {
       )}
 
       {/* ── FINISHED ── */}
-      {liveState === 'finished' && (
+      {!isPulseActive && liveState === 'finished' && (
         <>
           <div className="lg-gameover">
             <h1 className="lg-gameover-heading">GAME OVER</h1>
