@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ref, set, serverTimestamp } from 'firebase/database'
+import { db } from '../lib/firebase'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
 import { usePulseSession } from '../hooks/usePulseSession'
 import { api } from '../api/client'
@@ -40,6 +42,56 @@ function TeamScoreCard({ team, teamScore }) {
   )
 }
 
+function PulseTapScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
+  const [hasTapped, setHasTapped] = useState(false)
+
+  useEffect(() => {
+    setHasTapped(false)
+  }, [pulseSessionId])
+
+  async function handleTap() {
+    if (!pulseSessionId || !teamId || hasTapped) return
+    setHasTapped(true)
+    const tapRef = ref(db, `pulseSessions/${pulseSessionId}/taps/${teamId}`)
+    await set(tapRef, {
+      teamId,
+      teamName,
+      tappedAt: serverTimestamp(),
+    })
+  }
+
+  const isRevealed = pulseSession?.state === 'revealed'
+  const winner = pulseSession?.winner
+
+  return (
+    <div className="pulse-overlay">
+      <div className="pulse-branding">
+        <span className="pulse-logo-icon">⚡</span>
+        <span className="pulse-logo-text">PulseIQ</span>
+      </div>
+
+      {isRevealed ? (
+        <div className="pulse-winner-wrap">
+          <span className="pulse-winner-trophy">🏆</span>
+          <p className="pulse-winner-label">WINNER</p>
+          <p className="pulse-winner-name">{winner?.teamName ?? 'Fastest team!'}</p>
+        </div>
+      ) : (
+        <>
+          <p className="pulse-team-label">{teamName}</p>
+          <button
+            className={`pulse-tap-btn${hasTapped ? ' pulse-tap-btn--tapped' : ''}`}
+            onClick={handleTap}
+            disabled={hasTapped}
+          >
+            {hasTapped ? '⚡ Pulsed!' : 'TAP TO\nPULSE!'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function LiveGame() {
   const { gameId } = useParams()
 
@@ -72,7 +124,7 @@ export default function LiveGame() {
 
   // Pulse session — must be called before any early return
   const pulseTeamId = detail?.team?.id ?? liveTeamId
-  const { sessionData: pulseSession } = usePulseSession(pulseTeamId)
+  const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId)
   const isPulseActive = pulseSession != null && pulseSession.state !== 'setup'
 
   const loading = detailLoading || rtdbLoading
@@ -192,11 +244,12 @@ export default function LiveGame() {
 
       {/* ── PULSE SESSION ACTIVE ── */}
       {isPulseActive && (
-        <div className="lg-waiting">
-          <span className="lg-waiting-icon">⚡</span>
-          <p className="lg-waiting-title">Pulse session in progress</p>
-          <p className="lg-waiting-sub">This screen updates automatically</p>
-        </div>
+        <PulseTapScreen
+          pulseSession={pulseSession}
+          pulseSessionId={pulseSessionId}
+          teamId={teamId}
+          teamName={detail?.team?.name ?? d?.team?.name}
+        />
       )}
 
       {/* ── LOBBY / null ── */}

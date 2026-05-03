@@ -60,5 +60,5 @@ export function usePulseSession(teamId) {
     await set(submissionRef, Number(answer))
   }
 
-  return { sessionData, submitAnswer }
+  return { sessionData, sessionId, submitAnswer }
 }
