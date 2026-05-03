@@ -511,3 +511,111 @@
   height: 80px;
   border-radius: 16px;
 }
+
+/* ── Pulse tap screen ────────────────────────────────────────────────────── */
+.pulse-overlay {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 24px;
+  text-align: center;
+  background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.08) 0%, transparent 70%);
+}
+
+.pulse-branding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-logo-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.pulse-logo-text {
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #f59e0b;
+  text-transform: uppercase;
+}
+
+.pulse-team-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #d4cfc6;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.pulse-tap-btn {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: none;
+  background: #f59e0b;
+  color: #111008;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: pre-line;
+  cursor: pointer;
+  animation: pulse-tap-ring 1.8s ease-out infinite;
+  transition: transform 0.1s, filter 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pulse-tap-btn:active {
+  transform: scale(0.93);
+  filter: brightness(0.95);
+}
+
+.pulse-tap-btn--tapped {
+  background: #1c1c14;
+  color: #f59e0b;
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  font-size: 1.5rem;
+  animation: none;
+  cursor: default;
+}
+
+@keyframes pulse-tap-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+  65%  { box-shadow: 0 0 0 32px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.pulse-winner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-winner-trophy {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.pulse-winner-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #f59e0b;
+  margin: 4px 0 0;
+}
+
+.pulse-winner-name {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #f5f0e8;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
+}
