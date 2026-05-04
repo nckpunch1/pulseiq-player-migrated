@@ -378,7 +378,7 @@ export default function LiveGame() {
 
   const isLobby = !liveState || liveState === 'lobby'
 
-  const showPulseBar = pulseTeamScore !== null && !isLobby && !isPulseActive
+  const showPulseBar = pulseTeamScore !== null
 
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
