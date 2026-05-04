@@ -381,20 +381,36 @@ export async function createTeam(teamName) {
 }
 
 export async function searchTeams(queryStr) {
-  const q = queryStr.toLowerCase()
+  const q = queryStr.toLowerCase().trim()
+  if (!q) return { teams: [] }
+
   const snap = await getDocs(
     query(
       collection(firestore, 'teams'),
       where('nameLower', '>=', q),
       where('nameLower', '<=', q + ''),
       limit(20),
-    ),
+    )
   )
 
+  // Also do a broader fetch and filter client-side to catch teams
+  // that were created without the nameLower field
+  const allSnap = await getDocs(
+    query(collection(firestore, 'teams'), limit(200))
+  )
+
+  const matchedIds = new Set(snap.docs.map(d => d.id))
+  const allDocs = allSnap.docs.filter(d => {
+    if (matchedIds.has(d.id)) return false
+    const name = d.data().name ?? ''
+    return name.toLowerCase().includes(q)
+  })
+
+  const combined = [...snap.docs, ...allDocs]
+
   const teams = await Promise.all(
-    snap.docs.map(async d => {
+    combined.map(async d => {
       const data = d.data()
-      // Get captain's display name
       let captainName = ''
       try {
         if (data.captainId) {
@@ -403,9 +419,8 @@ export async function searchTeams(queryStr) {
         }
       } catch { /* non-critical */ }
 
-      // Count active members
       const membersSnap = await getDocs(
-        query(collection(firestore, 'teams', d.id, 'members'), where('status', '==', 'member')),
+        query(collection(firestore, 'teams', d.id, 'members'), where('status', '==', 'member'))
       )
 
       return {
@@ -414,7 +429,7 @@ export async function searchTeams(queryStr) {
         member_count: membersSnap.size,
         captain_name: captainName,
       }
-    }),
+    })
   )
 
   return { teams }
