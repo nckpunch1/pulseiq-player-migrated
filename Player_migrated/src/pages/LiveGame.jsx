@@ -247,6 +247,74 @@ function PulseOverlay({ pulseSession, pulseSessionId, teamId, teamName }) {
   return null
 }
 
+function PulseMeterBar({ score, maxScore = 4, teamName }) {
+  if (score == null) return null
+  const pct = Math.min(100, (score / maxScore) * 100)
+  const isEmpty = score === 0
+  const isFull = score >= maxScore
+
+  return (
+    <div className="pulse-meter-bar-wrap">
+      <style>{`
+        @keyframes electric {
+          0%   { background-position: 0% 50%; opacity: 0.9; }
+          50%  { background-position: 100% 50%; opacity: 1; }
+          100% { background-position: 0% 50%; opacity: 0.9; }
+        }
+        @keyframes electric-flicker {
+          0%, 100% { opacity: 1; }
+          10%       { opacity: 0.7; }
+          12%       { opacity: 1; }
+          50%       { opacity: 0.85; }
+          52%       { opacity: 1; }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 8px rgba(249,115,22,0.6), 0 0 20px rgba(249,115,22,0.3); }
+          50%       { box-shadow: 0 0 16px rgba(249,115,22,0.9), 0 0 40px rgba(249,115,22,0.5); }
+        }
+      `}</style>
+      <div className="pulse-meter-bar-inner">
+        <span className="pulse-meter-bar-label">⚡ PULSE</span>
+        <div className="pulse-meter-bar-track">
+          {!isEmpty && (
+            <div
+              className="pulse-meter-bar-fill"
+              style={{
+                width: `${pct}%`,
+                background: isFull
+                  ? 'linear-gradient(90deg, #f97316, #fbbf24, #f97316, #fb923c, #f97316)'
+                  : 'linear-gradient(90deg, #c2410c, #f97316, #fb923c, #f97316)',
+                backgroundSize: '200% 100%',
+                animation: isFull
+                  ? 'electric 0.8s ease-in-out infinite, electric-flicker 1.2s ease-in-out infinite, pulse-glow 1s ease-in-out infinite'
+                  : 'electric 1.4s ease-in-out infinite',
+                borderRadius: 6,
+                height: '100%',
+                transition: 'width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            />
+          )}
+          {/* Segment dividers */}
+          {Array.from({ length: maxScore - 1 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `${((i + 1) / maxScore) * 100}%`,
+                top: 0, bottom: 0,
+                width: 2,
+                background: 'rgba(0,0,0,0.4)',
+                zIndex: 2,
+              }}
+            />
+          ))}
+        </div>
+        <span className="pulse-meter-bar-score">{score}/{maxScore}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function LiveGame() {
   const { gameId } = useParams()
 
@@ -308,6 +376,9 @@ export default function LiveGame() {
   const roundScores = d?.round_scores ?? []
 
   const isLobby = !liveState || liveState === 'lobby'
+
+  const pulseTeamScore = pulseSession?.teams?.[teamId]?.pulseScore ?? null
+  const showPulseBar = pulseTeamScore != null && !isPulseActive && !isLobby
 
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
@@ -397,6 +468,13 @@ export default function LiveGame() {
             ? 'Connection lost — showing last known state'
             : '⚠ Reconnecting...'}
         </div>
+      )}
+
+      {showPulseBar && (
+        <PulseMeterBar
+          score={pulseTeamScore}
+          teamName={detail?.team?.name}
+        />
       )}
 
       {/* ── PULSE SESSION ACTIVE ── */}
