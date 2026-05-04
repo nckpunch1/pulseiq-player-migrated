@@ -348,6 +348,7 @@ export default function LiveGame() {
   // Pulse session — must be called before any early return
   const pulseTeamId = detail?.team?.id ?? liveTeamId
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId)
+  const pulseTeamScore = pulseSession?.teams?.[pulseTeamId]?.pulseScore ?? null
   const isPulseActive = pulseSession != null &&
     pulseSession.state !== 'setup' &&
     pulseSession.state !== 'complete'
@@ -377,8 +378,7 @@ export default function LiveGame() {
 
   const isLobby = !liveState || liveState === 'lobby'
 
-  const pulseTeamScore = pulseSession?.teams?.[teamId]?.pulseScore ?? null
-  const showPulseBar = pulseTeamScore != null && !isPulseActive && !isLobby
+  const showPulseBar = pulseTeamScore !== null && !isLobby && !isPulseActive
 
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
@@ -461,6 +461,8 @@ export default function LiveGame() {
         <GameStateBadge status={gameStatus} />
       </header>
 
+      {showPulseBar && <PulseMeterBar score={pulseTeamScore} />}
+
       {/* ── Reconnection bar ── */}
       {isReconnecting && (
         <div className="lg-reconnect-bar">
@@ -468,13 +470,6 @@ export default function LiveGame() {
             ? 'Connection lost — showing last known state'
             : '⚠ Reconnecting...'}
         </div>
-      )}
-
-      {showPulseBar && (
-        <PulseMeterBar
-          score={pulseTeamScore}
-          teamName={detail?.team?.name}
-        />
       )}
 
       {/* ── PULSE SESSION ACTIVE ── */}
