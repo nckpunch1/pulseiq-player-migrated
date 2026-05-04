@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ref, set, serverTimestamp } from 'firebase/database'
+import { ref, set, onValue, serverTimestamp } from 'firebase/database'
 import { db } from '../lib/firebase'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
 import { usePulseSession } from '../hooks/usePulseSession'
@@ -347,8 +347,19 @@ export default function LiveGame() {
 
   // Pulse session — must be called before any early return
   const pulseTeamId = detail?.team?.id ?? liveTeamId
+
+  const [pulseTeamScore, setPulseTeamScore] = useState(null)
+
+  useEffect(() => {
+    if (!gameId || !pulseTeamId) return
+    const scoreRef = ref(db, `pulseSessions/${gameId}/teams/${pulseTeamId}/pulseScore`)
+    const unsub = onValue(scoreRef, (snap) => {
+      setPulseTeamScore(snap.exists() ? snap.val() : null)
+    })
+    return () => unsub()
+  }, [gameId, pulseTeamId])
+
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId)
-  const pulseTeamScore = pulseSession?.teams?.[pulseTeamId]?.pulseScore ?? null
   const isPulseActive = pulseSession != null &&
     pulseSession.state !== 'setup' &&
     pulseSession.state !== 'complete'
