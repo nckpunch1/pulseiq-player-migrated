@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ref, set, onValue, serverTimestamp } from 'firebase/database'
+import { ref, set, serverTimestamp } from 'firebase/database'
 import { db } from '../lib/firebase'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { firestore } from '../lib/firebase'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
 import { usePulseSession } from '../hooks/usePulseSession'
 import { api } from '../api/client'
@@ -352,9 +354,9 @@ export default function LiveGame() {
 
   useEffect(() => {
     if (!gameId || !pulseTeamId) return
-    const scoreRef = ref(db, `pulseSessions/${gameId}/teams/${pulseTeamId}/pulseScore`)
-    const unsub = onValue(scoreRef, (snap) => {
-      setPulseTeamScore(snap.exists() ? snap.val() : null)
+    const docRef = doc(firestore, 'sessions', gameId, 'pulseMeter', pulseTeamId)
+    const unsub = onSnapshot(docRef, (snap) => {
+      setPulseTeamScore(snap.exists() ? (snap.data().score ?? 0) : null)
     })
     return () => unsub()
   }, [gameId, pulseTeamId])
