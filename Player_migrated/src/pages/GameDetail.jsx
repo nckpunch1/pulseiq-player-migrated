@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import './game-detail.css'
 
@@ -60,6 +62,9 @@ export default function GameDetail() {
   const [actionError, setActionError] = useState('')
 
   useEffect(() => {
+    let unsubSession = null
+    let unsubRegistration = null
+
     ;(async () => {
       try {
         let data
@@ -76,12 +81,77 @@ export default function GameDetail() {
         setDetail(data)
         const initialSize = data.registration?.expected_team_size ?? data.registration?.confirmed_team_size
         if (initialSize) setTeamSize(initialSize)
+        setLoading(false)
+
+        // Real-time listener: session status (goes live, completes, etc.)
+        unsubSession = onSnapshot(
+          doc(firestore, 'sessions', canonicalSessionId),
+          (snap) => {
+            if (!snap.exists()) return
+            const s = snap.data()
+            setDetail(prev => ({
+              ...prev,
+              game: { ...prev.game, status: s.status, game_state: s.status === 'live' ? 'live' : null },
+              can_register: !prev.registration && (s.status === 'open' || s.status === 'scheduled'),
+            }))
+          }
+        )
+
+        // Real-time listener: registration doc (confirmation_requested, checked_in, etc.)
+        const teamId = data.team?.id ?? null
+        if (teamId) {
+          unsubRegistration = onSnapshot(
+            doc(firestore, 'sessions', canonicalSessionId, 'registrations', teamId),
+            (snap) => {
+              if (!snap.exists()) {
+                setDetail(prev => ({
+                  ...prev,
+                  registration: null,
+                  can_confirm_attendance: false,
+                  can_register: prev.game?.status === 'open' || prev.game?.status === 'scheduled',
+                }))
+                return
+              }
+              const reg = snap.data()
+              const attendanceStatus = reg.attendanceStatus ?? 'not_requested'
+              const registrationStatus =
+                attendanceStatus === 'checked_in' ? 'checked_in' :
+                attendanceStatus === 'no_show' ? 'no_show' :
+                attendanceStatus === 'confirmed' ? 'confirmed' :
+                (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') ? 'confirmation_requested' :
+                'registered'
+              setDetail(prev => ({
+                ...prev,
+                registration: {
+                  id: teamId,
+                  session_id: canonicalSessionId,
+                  game_id: canonicalSessionId,
+                  team_id: teamId,
+                  team_name: data.team?.name ?? reg.teamName,
+                  expected_team_size: reg.teamSize ?? null,
+                  confirmed_team_size: reg.confirmedTeamSize ?? null,
+                  attendance_status: attendanceStatus,
+                  registration_status: registrationStatus,
+                  status: 'registered',
+                },
+                can_confirm_attendance:
+                  (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') &&
+                  prev.game?.status !== 'completed',
+                can_register: false,
+              }))
+            }
+          )
+        }
       } catch (err) {
         setPageError(err.message ?? 'Failed to load game.')
-      } finally {
         setLoading(false)
       }
     })()
+
+    return () => {
+      unsubSession?.()
+      unsubRegistration?.()
+    }
   }, [canonicalSessionId])
 
   async function handleRegister() {

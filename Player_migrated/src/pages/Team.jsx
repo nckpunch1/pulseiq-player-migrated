@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { doc, collection, query, onSnapshot } from 'firebase/firestore'
+import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 import './team.css'
@@ -32,30 +34,128 @@ export default function Team() {
   // ── Leave
   const [leaveBusy, setLeaveBusy] = useState(false)
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function load() {
-    setLoadState('loading')
-    setPageError('')
-    try {
-      const data = await api.getTeam()
-      if (!data.team) {
-        setLoadState('no-team')
-        return
-      }
-      setTeamData(data)
-      setLoadState('has-team')
-      if (data.membership?.is_captain) {
-        try {
-          const rData = await api.getJoinRequests(data.team.id)
-          setJoinRequests(rData.requests ?? [])
-        } catch { /* non-critical */ }
-      }
-    } catch (err) {
-      setPageError(err.message ?? 'Failed to load team.')
+  useEffect(() => {
+    const user = auth.currentUser
+    if (!user) {
+      setPageError('Not logged in.')
       setLoadState('error')
+      return
     }
-  }
+
+    let unsubTeam = null
+    let unsubMembers = null
+    let currentTeamId = null
+    let latestTeamDoc = null
+    let latestMembersDocs = null
+
+    function rebuildState(teamId) {
+      if (!latestTeamDoc || !latestMembersDocs) return
+      const isCaptain = latestTeamDoc.captainId === user.uid
+      const myMember = latestMembersDocs.find(m => m.userId === user.uid && m.status === 'member')
+      const myRole = myMember?.role ?? 'member'
+
+      const members = latestMembersDocs
+        .filter(m => m.status === 'member')
+        .map(m => ({
+          player_id: m.userId,
+          player_name: m.displayName,
+          username: m.username,
+          is_captain: latestTeamDoc.captainId === m.userId,
+          is_scribe: m.role === 'scribe' || m.role === 'captain',
+          status: 'active',
+        }))
+
+      setTeamData({
+        team: { id: teamId, name: latestTeamDoc.name, member_count: members.length },
+        membership: {
+          player_id: user.uid,
+          team_id: teamId,
+          is_captain: isCaptain,
+          is_scribe: myRole === 'scribe' || myRole === 'captain',
+        },
+        members,
+      })
+
+      if (isCaptain) {
+        setJoinRequests(
+          latestMembersDocs
+            .filter(m => m.status === 'pending')
+            .map(m => ({
+              id: m.id,
+              team_id: teamId,
+              player_id: m.userId,
+              player_name: m.displayName,
+              player_username: m.username,
+              status: 'pending',
+            }))
+        )
+      }
+
+      setLoadState('has-team')
+    }
+
+    function subscribeToTeam(teamId) {
+      latestTeamDoc = null
+      latestMembersDocs = null
+
+      unsubTeam = onSnapshot(
+        doc(firestore, 'teams', teamId),
+        (snap) => {
+          if (!snap.exists()) {
+            setLoadState('no-team')
+            setTeamData(null)
+            return
+          }
+          latestTeamDoc = snap.data()
+          rebuildState(teamId)
+        },
+        (err) => {
+          setPageError(err.message ?? 'Failed to load team.')
+          setLoadState('error')
+        }
+      )
+
+      unsubMembers = onSnapshot(
+        query(collection(firestore, 'teams', teamId, 'members')),
+        (snap) => {
+          latestMembersDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          rebuildState(teamId)
+        }
+      )
+    }
+
+    const unsubUser = onSnapshot(
+      doc(firestore, 'users', user.uid),
+      (snap) => {
+        const teamId = snap.data()?.teamId ?? null
+        if (teamId === currentTeamId) return
+        currentTeamId = teamId
+        unsubTeam?.()
+        unsubMembers?.()
+        unsubTeam = null
+        unsubMembers = null
+        if (!teamId) {
+          latestTeamDoc = null
+          latestMembersDocs = null
+          setLoadState('no-team')
+          setTeamData(null)
+          setJoinRequests([])
+          return
+        }
+        subscribeToTeam(teamId)
+      },
+      (err) => {
+        setPageError(err.message ?? 'Failed to load user data.')
+        setLoadState('error')
+      }
+    )
+
+    return () => {
+      unsubUser()
+      unsubTeam?.()
+      unsubMembers?.()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -66,9 +166,10 @@ export default function Team() {
     try {
       const data = await api.createTeam(name)
       setSessionFromResponse(data)
-      await load()
+      // listener will detect the new teamId on the user doc and update state
     } catch (err) {
       setCreateError(err.message ?? 'Failed to create team.')
+    } finally {
       setCreateBusy(false)
     }
   }
@@ -105,11 +206,8 @@ export default function Team() {
   async function handleJoinRequest(requestId, action) {
     setHandlingId(requestId)
     try {
-      const data = await api.handleJoinRequest(requestId, action)
-      setJoinRequests(prev => prev.filter(r => r.id !== requestId))
-      if (data.members) {
-        setTeamData(prev => ({ ...prev, members: data.members }))
-      }
+      await api.handleJoinRequest(requestId, action)
+      // listener auto-updates members and join requests
     } catch {
       // swallow — request remains in list for retry
     } finally {
@@ -123,7 +221,7 @@ export default function Team() {
     try {
       const data = await api.leaveTeam(teamData.team.id)
       setSessionFromResponse(data)
-      await load()
+      // listener will detect the teamId removal on the user doc and update state
     } catch (err) {
       setPageError(err.message ?? 'Failed to leave team.')
     } finally {
