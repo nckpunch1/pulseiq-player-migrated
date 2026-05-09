@@ -142,7 +142,7 @@ function PulseAnswerScreen({ pulseSession, pulseSessionId, teamId, teamName }) {
     const parsed = Number(answer)
     if (isNaN(parsed)) return
     setSubmitted(true)
-    const answerRef = ref(db, `pulseSessions/${pulseSessionId}/answers/${teamId}`)
+    const answerRef = ref(db, `pulseSessions/${pulseSessionId}/currentGame/answers/${teamId}`)
     await set(answerRef, { teamId, teamName, answer: parsed })
   }
 
