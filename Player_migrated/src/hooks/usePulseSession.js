@@ -26,7 +26,9 @@ export function usePulseSession(teamId) {
       (snap) => {
         const sessions = snap.val() ?? {}
         const activeId =
-          Object.entries(sessions).find(([, s]) => s?.state && s.state !== 'setup')?.[0] ?? null
+          Object.entries(sessions).find(
+            ([, s]) => s?.state && s.state !== 'setup' && s.state !== 'complete'
+          )?.[0] ?? null
         setSessionId(activeId)
       },
       (err) => {

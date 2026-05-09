@@ -193,15 +193,15 @@ function PulseBlitzScreen({ pulseSession }) {
       {q ? (
         <>
           <p className="pulse-blitz-counter">Question {idx + 1} of {questions.length}</p>
-          <p className="pulse-question-text">{q.question}</p>
+          <p className="pulse-question-text">{q.question ?? q.text}</p>
           <div className="pulse-blitz-choices">
             <div className="pulse-blitz-choice">
               <span className="pulse-blitz-choice-label">A</span>
-              <span className="pulse-blitz-choice-text">{q.choiceA}</span>
+              <span className="pulse-blitz-choice-text">{q.choiceA ?? q.choices?.[0]}</span>
             </div>
             <div className="pulse-blitz-choice">
               <span className="pulse-blitz-choice-label">B</span>
-              <span className="pulse-blitz-choice-text">{q.choiceB}</span>
+              <span className="pulse-blitz-choice-text">{q.choiceB ?? q.choices?.[1]}</span>
             </div>
           </div>
         </>
@@ -567,6 +567,7 @@ export default function LiveGame() {
       {/* ── ROUND RESULTS ── */}
       {!isPulseActive && liveState === 'round_results' && (
         <>
+          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
           {roundScores.length > 0 && (
             <section className="lg-section">
               <p className="lg-section-title">ROUND SCORES</p>
@@ -580,25 +581,6 @@ export default function LiveGame() {
               </div>
             </section>
           )}
-          {leaderboard.length > 0 && (
-            <section className="lg-section">
-              <p className="lg-section-title">LEADERBOARD</p>
-              <div className="lg-leaderboard">
-                {leaderboard.map(entry => (
-                  <div
-                    key={entry.teamId}
-                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
-                  >
-                    <span className="lg-lb-rank">
-                      {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
-                    </span>
-                    <span className="lg-lb-name">{entry.teamName}</span>
-                    <span className="lg-lb-score">{entry.score}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
           <p className="lg-results-sub">Next round starting soon...</p>
         </>
       )}
@@ -606,27 +588,7 @@ export default function LiveGame() {
       {/* ── ROUND RESULTS REVEALED ── */}
       {!isPulseActive && liveState === 'round_results_revealed' && (
         <>
-          <div className="lg-lb-heading-wrap">
-            <h2 className="lg-lb-heading">LEADERBOARD</h2>
-          </div>
-          {leaderboard.length > 0 && (
-            <section className="lg-section">
-              <div className="lg-leaderboard">
-                {leaderboard.map(entry => (
-                  <div
-                    key={entry.teamId}
-                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
-                  >
-                    <span className="lg-lb-rank">
-                      {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
-                    </span>
-                    <span className="lg-lb-name">{entry.teamName}</span>
-                    <span className="lg-lb-score">{entry.score}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
           <p className="lg-results-sub">Next round starting soon...</p>
         </>
       )}
@@ -634,25 +596,10 @@ export default function LiveGame() {
       {/* ── LEADERBOARD ── */}
       {!isPulseActive && liveState === 'leaderboard' && (
         <>
-          <div className="lg-lb-heading-wrap">
-            <h2 className="lg-lb-heading">LEADERBOARD</h2>
+          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
+          <div className="lg-info-card">
+            Check the big screen for the leaderboard!
           </div>
-          <section className="lg-section">
-            <div className="lg-leaderboard">
-              {leaderboard.map(entry => (
-                <div
-                  key={entry.teamId}
-                  className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
-                >
-                  <span className="lg-lb-rank">
-                    {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
-                  </span>
-                  <span className="lg-lb-name">{entry.teamName}</span>
-                  <span className="lg-lb-score">{entry.score}</span>
-                </div>
-              ))}
-            </div>
-          </section>
         </>
       )}
 
@@ -662,25 +609,7 @@ export default function LiveGame() {
           <div className="lg-gameover">
             <h1 className="lg-gameover-heading">GAME OVER</h1>
           </div>
-          {leaderboard.length > 0 && (
-            <section className="lg-section">
-              <p className="lg-section-title">FINAL LEADERBOARD</p>
-              <div className="lg-leaderboard">
-                {leaderboard.map(entry => (
-                  <div
-                    key={entry.teamId}
-                    className={`lg-lb-row${entry.teamId === teamId ? ' lg-lb-row--mine' : ''}`}
-                  >
-                    <span className="lg-lb-rank">
-                      {entry.rank === 1 ? '🏆' : `#${entry.rank}`}
-                    </span>
-                    <span className="lg-lb-name">{entry.teamName}</span>
-                    <span className="lg-lb-score">{entry.score}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
           <p className="lg-thanks">Thanks for playing!</p>
           <Link to="/dashboard" className="lg-dash-btn">
             Back to Dashboard
