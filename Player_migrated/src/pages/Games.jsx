@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import './games.css'
 
@@ -27,10 +29,65 @@ export default function Games() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    const sessUnsubs = new Map()
+    const regUnsubs = new Map()
+
+    function mapStatus(attendanceStatus) {
+      if (attendanceStatus === 'checked_in') return 'checked_in'
+      if (attendanceStatus === 'no_show') return 'no_show'
+      if (attendanceStatus === 'confirmed') return 'confirmed'
+      if (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') return 'confirmation_requested'
+      return 'registered'
+    }
+
     api.getGames()
-      .then(data => setGames(data.games ?? []))
-      .catch(err => setError(err.message ?? 'Failed to load games.'))
-      .finally(() => setLoading(false))
+      .then(data => {
+        const initialGames = data.games ?? []
+        setGames(initialGames)
+        setLoading(false)
+
+        const teamId = initialGames.find(g => g.team_id)?.team_id ?? null
+
+        for (const game of initialGames) {
+          const sessionId = game.canonical_session_id
+
+          // Session status listener (e.g. game goes live or completes)
+          sessUnsubs.set(sessionId, onSnapshot(
+            doc(firestore, 'sessions', sessionId),
+            (snap) => {
+              if (!snap.exists()) return
+              const status = snap.data().status
+              setGames(prev => prev.map(g =>
+                g.canonical_session_id === sessionId ? { ...g, status } : g
+              ))
+            }
+          ))
+
+          // Registration status listener (confirmation_requested, checked_in, etc.)
+          if (teamId) {
+            regUnsubs.set(sessionId, onSnapshot(
+              doc(firestore, 'sessions', sessionId, 'registrations', teamId),
+              (snap) => {
+                setGames(prev => prev.map(g => {
+                  if (g.canonical_session_id !== sessionId) return g
+                  if (!snap.exists()) return { ...g, registration_status: 'not_registered', team_name: null }
+                  const reg = snap.data()
+                  return { ...g, registration_status: mapStatus(reg.attendanceStatus), team_name: reg.teamName ?? g.team_name }
+                }))
+              }
+            ))
+          }
+        }
+      })
+      .catch(err => {
+        setError(err.message ?? 'Failed to load games.')
+        setLoading(false)
+      })
+
+    return () => {
+      for (const unsub of sessUnsubs.values()) unsub()
+      for (const unsub of regUnsubs.values()) unsub()
+    }
   }, [])
 
   if (loading) {
