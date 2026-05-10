@@ -214,15 +214,23 @@ export async function dashboard() {
       is_scribe: myMemberData.role === 'scribe' || myMemberData.role === 'captain',
     }
 
-    // Registration status per session
-    for (const sessDoc of sessSnap.docs) {
+    const sessionDocs = sessSnap.docs
+    const registrationSnaps = teamId
+      ? await Promise.all(
+          sessionDocs.map(sessDoc =>
+            getDocs(query(
+              collection(firestore, 'sessions', sessDoc.id, 'registrations'),
+              where('teamId', '==', teamId),
+            ))
+          )
+        )
+      : sessionDocs.map(() => ({ empty: true, docs: [] }))
+
+    for (let i = 0; i < sessionDocs.length; i++) {
+      const sessDoc = sessionDocs[i]
       const sessData = sessDoc.data()
-      const regQuery = query(
-        collection(firestore, 'sessions', sessDoc.id, 'registrations'),
-        where('teamId', '==', teamId),
-      )
-      const regSnap = await getDocs(regQuery)
-      const regData = regSnap.empty ? null : regSnap.docs[0].data()
+      const regSnap = registrationSnaps[i]
+      const regData = regSnap.empty ? null : regSnap.docs[0]?.data()
       upcoming_games.push({
         id: sessDoc.id,
         canonical_session_id: sessDoc.id,
@@ -232,8 +240,10 @@ export async function dashboard() {
         date: sessData.date ?? sessData.startsAt,
         starts_at: tsToIso(sessData.startsAt),
         status: sessData.status,
-        registration_status: regData ? mapAttendanceStatus(regData.attendanceStatus) : 'not_registered',
-        team_name: regData ? team.name : null,
+        registration_status: regData
+          ? mapAttendanceStatus(regData.attendanceStatus)
+          : 'not_registered',
+        team_name: regData ? team?.name : null,
       })
     }
 
