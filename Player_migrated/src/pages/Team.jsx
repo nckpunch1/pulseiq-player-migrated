@@ -110,7 +110,7 @@ export default function Team() {
           rebuildState(teamId)
         },
         (err) => {
-          setPageError(err.message ?? 'Failed to load team.')
+          setPageError(`Failed to load team (${err.code ?? err.message}). Try refreshing.`)
           setLoadState('error')
         }
       )
@@ -122,7 +122,7 @@ export default function Team() {
           rebuildState(teamId)
         },
         (err) => {
-          setPageError(err.message ?? 'Failed to load team members.')
+          setPageError(`Failed to load team members (${err.code ?? err.message}). Try refreshing.`)
           setLoadState('error')
         }
       )
@@ -149,7 +149,7 @@ export default function Team() {
         subscribeToTeam(teamId)
       },
       (err) => {
-        setPageError(err.message ?? 'Failed to load user data.')
+        setPageError(`Failed to load your account (${err.code ?? err.message}). Try refreshing.`)
         setLoadState('error')
       }
     )
