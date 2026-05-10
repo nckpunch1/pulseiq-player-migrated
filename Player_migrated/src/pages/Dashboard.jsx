@@ -115,7 +115,7 @@ export default function Dashboard() {
       {/* ── Team ── */}
       <section className="dash-section">
         {team ? (
-          <div className="dash-card">
+          <Link to="/team" className="dash-card dash-card--team-link">
             <div className="dash-team-row">
               <div className="dash-team-name-group">
                 <span className="dash-team-name">{team.name}</span>
@@ -123,14 +123,16 @@ export default function Dashboard() {
                   <span className="dash-badge dash-badge--captain">Captain</span>
                 )}
               </div>
-              {isCaptain && pendingCount > 0 && (
-                <Link to="/team" className="dash-requests-link">
+              {isCaptain && pendingCount > 0 ? (
+                <div className="dash-requests-link">
                   <span className="dash-requests-label">Join Requests</span>
                   <span className="dash-notif-badge">{pendingCount}</span>
-                </Link>
+                </div>
+              ) : (
+                <span className="dash-team-arrow">→</span>
               )}
             </div>
-          </div>
+          </Link>
         ) : (
           <div className="dash-card dash-card--no-team">
             <p className="dash-no-team-title">You&apos;re not on a team yet</p>
