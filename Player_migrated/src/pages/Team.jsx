@@ -120,6 +120,10 @@ export default function Team() {
         (snap) => {
           latestMembersDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
           rebuildState(teamId)
+        },
+        (err) => {
+          setPageError(err.message ?? 'Failed to load team members.')
+          setLoadState('error')
         }
       )
     }

@@ -128,6 +128,24 @@
 
 /* ── Team card ─────────────────────────────────────────────────────────────── */
 
+.dash-card--team-link {
+  display: block;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dash-team-arrow {
+  font-size: 1.1rem;
+  color: #9a9590;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.dash-card--team-link:hover .dash-team-arrow {
+  color: #f59e0b;
+}
+
+
 .dash-team-row {
   display: flex;
   align-items: center;
