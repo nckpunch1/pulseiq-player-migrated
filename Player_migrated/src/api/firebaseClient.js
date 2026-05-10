@@ -371,6 +371,7 @@ export async function createTeam(teamName) {
       name: teamName,
       nameLower: teamName.toLowerCase(),
       captainId: user.uid,
+      captainName: userData.displayName ?? '',
       createdAt: serverTimestamp(),
       memberCount: 1,
     }),
@@ -394,57 +395,29 @@ export async function searchTeams(queryStr) {
   const q = queryStr.toLowerCase().trim()
   if (!q) return { teams: [] }
 
+  // Range query on pre-computed nameLower — O(results) reads, not O(all teams)
   const snap = await getDocs(
     query(
       collection(firestore, 'teams'),
       where('nameLower', '>=', q),
-      where('nameLower', '<=', q + ''),
+      where('nameLower', '<=', q + ''),
       limit(20),
     )
   )
 
-  // Also do a broader fetch and filter client-side to catch teams
-  // that were created without the nameLower field
-  const allSnap = await getDocs(
-    query(collection(firestore, 'teams'), limit(200))
-  )
-
-  const matchedIds = new Set(snap.docs.map(d => d.id))
-  const allDocs = allSnap.docs.filter(d => {
-    if (matchedIds.has(d.id)) return false
-    const name = d.data().name ?? ''
-    return name.toLowerCase().includes(q)
+  const teams = snap.docs.map(d => {
+    const data = d.data()
+    return {
+      id: d.id,
+      name: data.name,
+      // memberCount and captainName are denormalized on the team doc
+      member_count: data.memberCount ?? 0,
+      captain_name: data.captainName ?? '',
+    }
   })
-
-  const combined = [...snap.docs, ...allDocs]
-
-  const teams = await Promise.all(
-    combined.map(async d => {
-      const data = d.data()
-      let captainName = ''
-      try {
-        if (data.captainId) {
-          const captainDoc = await getDoc(doc(firestore, 'users', data.captainId))
-          captainName = captainDoc.data()?.displayName ?? ''
-        }
-      } catch { /* non-critical */ }
-
-      const membersSnap = await getDocs(
-        query(collection(firestore, 'teams', d.id, 'members'), where('status', '==', 'member'))
-      )
-
-      return {
-        id: d.id,
-        name: data.name,
-        member_count: membersSnap.size,
-        captain_name: captainName,
-      }
-    })
-  )
 
   return { teams }
 }
-
 export async function requestToJoin(teamId) {
   const user = requireUser()
   const userData = await getUserDoc(user.uid)
