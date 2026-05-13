@@ -264,7 +264,7 @@ export default function Team() {
       <div className="team-page">
         <header className="team-header">
           <Link to="/dashboard" className="team-back">← Dashboard</Link>
-          <p className="team-wordmark">QuizPulse</p>
+          <p className="team-wordmark">PulseIQ</p>
           <h1 className="team-page-title">Your Team</h1>
           <p className="team-page-subtitle">Create a team or request to join one.</p>
         </header>
@@ -388,7 +388,7 @@ export default function Team() {
       {/* ── Header ── */}
       <header className="team-header">
         <Link to="/dashboard" className="team-back">← Dashboard</Link>
-        <p className="team-wordmark">QuizPulse</p>
+        <p className="team-wordmark">PulseIQ</p>
         <div className="team-name-row">
           <h1 className="team-page-title">{team.name}</h1>
           {isCaptain && <span className="team-badge team-badge--captain">Captain</span>}

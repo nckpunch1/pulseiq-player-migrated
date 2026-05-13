@@ -21,13 +21,15 @@
 }
 
 .profile-back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #f59e0b;
   text-decoration: none;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
   transition: color 0.15s;
 }
 

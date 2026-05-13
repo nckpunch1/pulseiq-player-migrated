@@ -59,8 +59,11 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('season') // season | alltime
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
+    setError('')
     Promise.all([
       api.getLeaderboards(),
       api.getTeam().catch(() => null),
@@ -71,7 +74,7 @@ export default function Leaderboard() {
       })
       .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [retryCount])
 
   if (loading) {
     return (
@@ -88,6 +91,9 @@ export default function Leaderboard() {
       <div className="lb-page">
         <div className="lb-state-fill">
           <div className="lb-error-box">{error}</div>
+          <button style={{ marginTop: '12px', padding: '10px 24px', border: 'none', borderRadius: '8px', background: '#f97316', color: '#fff', fontWeight: 600, cursor: 'pointer' }} onClick={() => setRetryCount(c => c + 1)}>
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -101,7 +107,7 @@ export default function Leaderboard() {
 
       <header className="lb-header">
         <Link to="/dashboard" className="lb-back">← Dashboard</Link>
-        <p className="lb-wordmark">QuizPulse</p>
+        <p className="lb-wordmark">PulseIQ</p>
         <h1 className="lb-page-title">Leaderboard</h1>
         {tab === 'season' && current_season?.name && (
           <p className="lb-season-name">{current_season.name}</p>

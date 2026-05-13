@@ -100,7 +100,7 @@ export default function Profile() {
 
       <header className="profile-header">
         <Link to="/dashboard" className="profile-back">← Dashboard</Link>
-        <p className="profile-wordmark">QuizPulse</p>
+        <p className="profile-wordmark">PulseIQ</p>
         <h1 className="profile-title">Profile</h1>
       </header>
 
@@ -130,7 +130,7 @@ export default function Profile() {
               <input
                 id="prof-displayName"
                 type="text"
-                autoComplete="off"
+                autoComplete="name"
                 className="profile-input"
                 value={displayName}
                 onChange={e => { setDisplayName(e.target.value); setNameError(''); setNameSuccess('') }}

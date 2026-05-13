@@ -60,8 +60,12 @@ export default function GameDetail() {
   const [teamSize, setTeamSize] = useState(4)
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
+    setPageError('')
+    let cancelled = false
     let unsubSession = null
     let unsubRegistration = null
 
@@ -78,6 +82,7 @@ export default function GameDetail() {
             throw err
           }
         }
+        if (cancelled) return
         setDetail(data)
         const initialSize = data.registration?.expected_team_size ?? data.registration?.confirmed_team_size
         if (initialSize) setTeamSize(initialSize)
@@ -143,16 +148,19 @@ export default function GameDetail() {
           )
         }
       } catch (err) {
-        setPageError(err.message ?? 'Failed to load game.')
-        setLoading(false)
+        if (!cancelled) {
+          setPageError(err.message ?? 'Failed to load game.')
+          setLoading(false)
+        }
       }
     })()
 
     return () => {
+      cancelled = true
       unsubSession?.()
       unsubRegistration?.()
     }
-  }, [canonicalSessionId])
+  }, [canonicalSessionId, retryCount])
 
   async function handleRegister() {
     setActionBusy(true)
@@ -225,6 +233,9 @@ export default function GameDetail() {
       <div className="gd-page">
         <div className="gd-state-fill">
           <div className="gd-error-box">{pageError}</div>
+          <button className="gd-btn gd-btn--primary" style={{ marginTop: '12px' }} onClick={() => setRetryCount(c => c + 1)}>
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -249,7 +260,7 @@ export default function GameDetail() {
       {/* ── Header ── */}
       <header className="gd-header">
         <Link to="/games" className="gd-back">← Games</Link>
-        <p className="gd-wordmark">QuizPulse</p>
+        <p className="gd-wordmark">PulseIQ</p>
         <h1 className="gd-page-title">{game.name || 'Upcoming Game'}</h1>
       </header>
 

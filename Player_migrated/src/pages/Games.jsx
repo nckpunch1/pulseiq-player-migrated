@@ -27,8 +27,11 @@ export default function Games() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
+    setError('')
     const sessUnsubs = new Map()
     const regUnsubs = new Map()
 
@@ -88,7 +91,7 @@ export default function Games() {
       for (const unsub of sessUnsubs.values()) unsub()
       for (const unsub of regUnsubs.values()) unsub()
     }
-  }, [])
+  }, [retryCount])
 
   if (loading) {
     return (
@@ -105,6 +108,9 @@ export default function Games() {
       <div className="games-page">
         <div className="games-state-fill">
           <div className="games-error-box">{error}</div>
+          <button style={{ marginTop: '12px', padding: '10px 24px', border: 'none', borderRadius: '8px', background: '#f97316', color: '#fff', fontWeight: 600, cursor: 'pointer' }} onClick={() => setRetryCount(c => c + 1)}>
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -118,7 +124,7 @@ export default function Games() {
 
       <header className="games-header">
         <Link to="/dashboard" className="games-back">← Dashboard</Link>
-        <p className="games-wordmark">QuizPulse</p>
+        <p className="games-wordmark">PulseIQ</p>
         <h1 className="games-page-title">Upcoming Games</h1>
       </header>
 

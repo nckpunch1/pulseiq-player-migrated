@@ -1,5 +1,5 @@
 /**
- * Central API client for QuizPulse Player PWA.
+ * Central API client for PulseIQ Player PWA.
  *
  * All API calls in the app go through this module only.
  * Delegates to Firebase service functions in firebaseClient.js.

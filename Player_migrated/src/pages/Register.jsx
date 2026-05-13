@@ -113,14 +113,15 @@ export default function Register() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <Link to="/login" className="auth-back">← Back to login</Link>
         <p className="auth-logo">
           <span className="auth-logo-bolt">⚡</span>
-          <span className="auth-logo-name">QUIZPULSE </span>
+          <span className="auth-logo-name">PULSE</span>
           <span className="auth-logo-iq">IQ</span>
         </p>
         <p className="auth-tagline">Test your knowledge. Beat your mates.</p>
         <h1 className="auth-title">Create account</h1>
-        <p className="auth-subtitle">Join the QuizPulse player portal</p>
+        <p className="auth-subtitle">Join the PulseIQ player portal</p>
 
         {serverError && <p className="auth-server-error">{serverError}</p>}
 
@@ -134,7 +135,7 @@ export default function Register() {
                   id="reg-firstName"
                   name="firstName"
                   type="text"
-                  autoComplete="off"
+                  autoComplete="given-name"
                   className={`auth-input${errors.firstName ? ' auth-input--error' : ''}`}
                   placeholder="First name"
                   value={fields.firstName}
@@ -149,7 +150,7 @@ export default function Register() {
                   id="reg-lastName"
                   name="lastName"
                   type="text"
-                  autoComplete="off"
+                  autoComplete="family-name"
                   className={`auth-input${errors.lastName ? ' auth-input--error' : ''}`}
                   placeholder="Last name"
                   value={fields.lastName}
