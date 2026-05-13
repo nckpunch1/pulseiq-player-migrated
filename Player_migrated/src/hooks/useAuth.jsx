@@ -31,9 +31,19 @@ export function AuthProvider({ children }) {
           })
           setUser(firebaseUser)
         } catch {
-          setPlayer(null)
-          setUser(null)
-          setRequiresVerification(false)
+          // Firestore unavailable (network drop or iOS private mode) — honour the
+          // Firebase Auth session so the user isn't kicked to /login just because
+          // Firestore couldn't be reached. Profile fields will be blank until refresh.
+          setRequiresVerification(!firebaseUser.emailVerified)
+          setPlayer({
+            id: firebaseUser.uid,
+            email: firebaseUser.email ?? null,
+            display_name: firebaseUser.displayName ?? '',
+            username: '',
+            first_name: '',
+            last_name: '',
+          })
+          setUser(firebaseUser)
         }
       } else {
         setUser(null)

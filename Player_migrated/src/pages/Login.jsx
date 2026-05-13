@@ -116,7 +116,7 @@ export default function Login() {
       <div className="auth-card">
         <p className="auth-logo">
           <span className="auth-logo-bolt">⚡</span>
-          <span className="auth-logo-name">QUIZPULSE </span>
+          <span className="auth-logo-name">PULSE</span>
           <span className="auth-logo-iq">IQ</span>
         </p>
 
@@ -135,6 +135,7 @@ export default function Login() {
             {serverError && <p className="auth-server-error">{serverError}</p>}
             <input
               type="email"
+              autoComplete="email"
               placeholder="Your email address"
               value={resetEmail}
               onChange={e => setResetEmail(e.target.value)}
@@ -146,7 +147,8 @@ export default function Login() {
               type="button"
               onClick={() => setForgotPassword(false)}
               style={{ background: 'none', border: 'none', color: '#f97316',
-                cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.5rem', display: 'block' }}
+                cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.5rem',
+                display: 'flex', alignItems: 'center', minHeight: '44px' }}
             >
               Back to login
             </button>
@@ -161,7 +163,7 @@ export default function Login() {
       <div className="auth-card">
         <p className="auth-logo">
           <span className="auth-logo-bolt">⚡</span>
-          <span className="auth-logo-name">QUIZPULSE </span>
+          <span className="auth-logo-name">PULSE</span>
           <span className="auth-logo-iq">IQ</span>
         </p>
         <p className="auth-tagline">Test your knowledge. Beat your mates.</p>
@@ -205,7 +207,8 @@ export default function Login() {
                 type="button"
                 onClick={() => setForgotPassword(true)}
                 style={{ background: 'none', border: 'none', color: '#f97316',
-                  cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.5rem' }}
+                  cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.5rem',
+                  minHeight: '44px', display: 'flex', alignItems: 'center' }}
               >
                 Forgot password?
               </button>

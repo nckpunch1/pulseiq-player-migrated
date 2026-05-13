@@ -25,8 +25,11 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
+    setError('')
     ;(async () => {
       try {
         let data
@@ -47,7 +50,7 @@ export default function Dashboard() {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [retryCount])
 
   if (loading) {
     return (
@@ -64,6 +67,9 @@ export default function Dashboard() {
       <div className="dash-page">
         <div className="dash-state-fill">
           <div className="dash-error-box">{error}</div>
+          <button className="dash-btn dash-btn--primary" style={{ marginTop: '12px' }} onClick={() => setRetryCount(c => c + 1)}>
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -98,7 +104,7 @@ export default function Dashboard() {
 
       {/* ── Header ── */}
       <header className="dash-header">
-        <p className="dash-wordmark">QuizPulse</p>
+        <p className="dash-wordmark">PulseIQ</p>
         <h1 className="dash-player-name">{player.display_name}</h1>
         <p className="dash-username">@{player.username}</p>
       </header>

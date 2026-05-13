@@ -50,14 +50,16 @@
 }
 
 .games-back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #9a9590;
   text-decoration: none;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   transition: color 0.15s;
 }
 

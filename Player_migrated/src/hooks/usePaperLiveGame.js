@@ -10,14 +10,18 @@ export function usePaperLiveGame(gameId) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
   const [lastPollAttempt, setLastPollAttempt] = useState(null)
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
+  const [timedOut, setTimedOut] = useState(false)
 
-  const loading = lastKnownGoodState === null
+  // Loading until first snapshot arrives — but bail after 10 s so the live game
+  // page can render the lobby fallback rather than showing a skeleton forever.
+  const loading = lastKnownGoodState === null && !timedOut
 
   useEffect(() => {
     if (!gameId) return
 
     setIsPolling(true)
     setIsReconnecting(false)
+    setTimedOut(false)
 
     const liveRef = ref(db, `liveSessions/${gameId}`)
 
@@ -40,8 +44,11 @@ export function usePaperLiveGame(gameId) {
       },
     )
 
+    const loadTimer = setTimeout(() => setTimedOut(true), 10_000)
+
     return () => {
       unsub()
+      clearTimeout(loadTimer)
       setIsPolling(false)
     }
   }, [gameId])

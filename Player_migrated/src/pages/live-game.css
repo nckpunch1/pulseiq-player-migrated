@@ -30,6 +30,9 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   flex-shrink: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
 }
 
 .lg-header-center {

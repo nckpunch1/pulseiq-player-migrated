@@ -203,14 +203,14 @@ export async function resetPassword(email) {
 
 export async function dashboard() {
   const user = requireUser()
-  const userData = await getUserDoc(user.uid)
+
+  // Sessions query doesn't need teamId — run it in parallel with the user doc read
+  const [userData, sessSnap] = await Promise.all([
+    getUserDoc(user.uid),
+    getDocs(query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live']))),
+  ])
   const player = buildPlayer(user.uid, userData)
   const teamId = userData.teamId ?? null
-
-  // Upcoming sessions
-  const sessSnap = await getDocs(
-    query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live'])),
-  )
 
   let team = null
   let membership = null
@@ -269,11 +269,15 @@ export async function dashboard() {
       })
     }
 
-    // Pending join requests for captain
-    if (isCaptain) {
-      const reqSnap = await getDocs(
-        query(collection(firestore, 'teams', teamId, 'members'), where('status', '==', 'pending')),
-      )
+    // Join requests + active season in a single parallel batch — they're independent
+    const [reqSnap, seasonSnap] = await Promise.all([
+      isCaptain
+        ? getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('status', '==', 'pending')))
+        : Promise.resolve(null),
+      getDocs(query(collection(firestore, 'seasons'), where('status', '==', 'active'), limit(1))).catch(() => null),
+    ])
+
+    if (reqSnap) {
       reqSnap.forEach(d => {
         const rd = d.data()
         pending_join_requests.push({
@@ -286,12 +290,9 @@ export async function dashboard() {
       })
     }
 
-    // Season leaderboard summary
+    // Leaderboard is sequential after the season query because it needs seasonId
     try {
-      const seasonSnap = await getDocs(
-        query(collection(firestore, 'seasons'), where('status', '==', 'active'), limit(1)),
-      )
-      if (!seasonSnap.empty) {
+      if (seasonSnap && !seasonSnap.empty) {
         const seasonId = seasonSnap.docs[0].id
         const lbSnap = await getDoc(doc(firestore, 'seasons', seasonId, 'leaderboard', teamId))
         if (lbSnap.exists()) {
@@ -540,47 +541,62 @@ export async function leaveTeam(teamId) {
 
 export async function getGames() {
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
 
-  const sessSnap = await getDocs(
-    query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live'])),
+  // Sessions query doesn't need teamId — run it in parallel with the user doc read
+  const [userData, sessSnap] = await Promise.all([
+    getUserDoc(user.uid),
+    getDocs(query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live']))),
+  ])
+  const teamId = userData.teamId ?? null
+  const sessionDocs = sessSnap.docs
+
+  // Deduplicate venue IDs so a shared venue is only read once across all sessions
+  const uniqueVenueIds = [...new Set(sessionDocs.map(d => d.data().venueId).filter(Boolean))]
+
+  // All registrations + all unique venue reads in one parallel batch
+  const [registrationSnaps, venueSnaps] = await Promise.all([
+    teamId
+      ? Promise.all(sessionDocs.map(d =>
+          getDocs(query(
+            collection(firestore, 'sessions', d.id, 'registrations'),
+            where('teamId', '==', teamId),
+            limit(1),
+          ))
+        ))
+      : Promise.resolve(sessionDocs.map(() => ({ empty: true, docs: [] }))),
+    Promise.all(uniqueVenueIds.map(id =>
+      getDoc(doc(firestore, 'venues', id)).catch(() => null)
+    )),
+  ])
+
+  const venueMap = new Map(
+    uniqueVenueIds.map((id, i) => {
+      const snap = venueSnaps[i]
+      return [id, snap?.exists?.() ? (snap.data().name ?? '') : '']
+    })
   )
 
-  const games = await Promise.all(
-    sessSnap.docs.map(async d => {
-      const data = d.data()
-      let registrationStatus = 'not_registered'
-      let teamName = null
+  const games = sessionDocs.map((d, i) => {
+    const data = d.data()
+    const regSnap = registrationSnaps[i]
+    const regData = !regSnap.empty ? regSnap.docs[0]?.data() : null
+    const venueName = (data.venueId ? (venueMap.get(data.venueId) ?? '') : '') || data.venue || ''
 
-      if (teamId) {
-        const regSnap = await getDocs(
-          query(collection(firestore, 'sessions', d.id, 'registrations'), where('teamId', '==', teamId), limit(1)),
-        )
-        if (!regSnap.empty) {
-          const reg = regSnap.docs[0].data()
-          registrationStatus = mapAttendanceStatus(reg.attendanceStatus)
-          teamName = reg.teamName ?? null
-        }
-      }
-
-      const venueName = await getVenueName(data.venueId) || data.venue || ''
-
-      return {
-        id: d.id,
-        canonical_session_id: d.id,
-        game_id: d.id,
-        name: data.name ?? '',
-        title: data.title,
-        venue: venueName,
-        date: data.date ?? data.startsAt,
-        starts_at: tsToIso(data.startsAt),
-        status: data.status,
-        registration_status: registrationStatus,
-        team_id: teamId,
-        team_name: teamName,
-      }
-    }),
-  )
+    return {
+      id: d.id,
+      canonical_session_id: d.id,
+      game_id: d.id,
+      name: data.name ?? '',
+      title: data.title,
+      venue: venueName,
+      date: data.date ?? data.startsAt,
+      starts_at: tsToIso(data.startsAt),
+      status: data.status,
+      registration_status: regData ? mapAttendanceStatus(regData.attendanceStatus) : 'not_registered',
+      team_id: teamId,
+      team_name: regData?.teamName ?? null,
+    }
+  })
 
   return { games }
 }
