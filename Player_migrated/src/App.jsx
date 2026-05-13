@@ -9,7 +9,8 @@ import MiniGameOverlay from './components/MiniGameOverlay.jsx'
 // on every protected page and lazy-loading them would cause a visible flash.
 const Login        = lazy(() => import('./pages/Login.jsx'))
 const Register     = lazy(() => import('./pages/Register.jsx'))
-const VerifyPending = lazy(() => import('./pages/VerifyPending.jsx'))
+const VerifyPending  = lazy(() => import('./pages/VerifyPending.jsx'))
+const Verification   = lazy(() => import('./pages/Verification.jsx'))
 const Dashboard    = lazy(() => import('./pages/Dashboard.jsx'))
 const Team         = lazy(() => import('./pages/Team.jsx'))
 const Games        = lazy(() => import('./pages/Games.jsx'))
@@ -70,6 +71,7 @@ export default function App() {
             </Route>
 
             <Route path="/verify-pending" element={<VerifyPending />} />
+            <Route path="/verification"  element={<Verification />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>
