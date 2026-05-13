@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
   const [player, setPlayer] = useState(null)
   const [isCaptain, setIsCaptain] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [requiresVerification, setRequiresVerification] = useState(false)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -18,6 +19,8 @@ export function AuthProvider({ children }) {
         try {
           const snap = await getDoc(doc(firestore, 'users', firebaseUser.uid))
           const ud = snap.exists() ? snap.data() : {}
+          const isVerified = firebaseUser.emailVerified || ud.manuallyVerified === true
+          setRequiresVerification(!isVerified)
           setPlayer({
             id: firebaseUser.uid,
             email: ud.email ?? null,
@@ -30,11 +33,13 @@ export function AuthProvider({ children }) {
         } catch {
           setPlayer(null)
           setUser(null)
+          setRequiresVerification(false)
         }
       } else {
         setUser(null)
         setPlayer(null)
         setIsCaptain(false)
+        setRequiresVerification(false)
       }
       setLoading(false)
     })
@@ -47,6 +52,9 @@ export function AuthProvider({ children }) {
     }
     if (data?.membership !== undefined) {
       setIsCaptain(data.membership?.is_captain ?? false)
+    }
+    if (data?.requiresVerification !== undefined) {
+      setRequiresVerification(data.requiresVerification)
     }
   }, [])
 
@@ -63,6 +71,7 @@ export function AuthProvider({ children }) {
       setUser(null)
       setPlayer(null)
       setIsCaptain(false)
+      setRequiresVerification(false)
     }
   }, [])
 
@@ -73,7 +82,7 @@ export function AuthProvider({ children }) {
   const isLoggedIn = Boolean(user)
 
   return (
-    <AuthContext.Provider value={{ player, token, isCaptain, isLoggedIn, login, logout, setSessionFromResponse }}>
+    <AuthContext.Provider value={{ player, token, isCaptain, isLoggedIn, loading, requiresVerification, login, logout, setSessionFromResponse }}>
       {children}
     </AuthContext.Provider>
   )

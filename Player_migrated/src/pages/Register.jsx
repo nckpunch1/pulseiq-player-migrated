@@ -4,16 +4,16 @@ import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth.jsx'
 import './auth.css'
 
-function validate({ firstName, lastName, username, password, confirmPassword }) {
+function validate({ firstName, lastName, email, password, confirmPassword }) {
   const errors = {}
   if (!firstName.trim()) errors.firstName = 'Required'
   if (!lastName.trim())  errors.lastName  = 'Required'
-  if (!username.trim())               errors.username = 'Username is required'
-  else if (username.trim().length < 3) errors.username = 'At least 3 characters'
+  if (!email.trim())                   errors.email = 'Email is required'
+  else if (!/\S+@\S+\.\S+/.test(email)) errors.email = 'Enter a valid email address'
   if (!password)               errors.password = 'Password is required'
   else if (password.length < 8) errors.password = 'At least 8 characters'
-  if (!confirmPassword)                     errors.confirmPassword = 'Please confirm your password'
-  else if (password !== confirmPassword)    errors.confirmPassword = "Passwords don't match"
+  if (!confirmPassword)                  errors.confirmPassword = 'Please confirm your password'
+  else if (password !== confirmPassword) errors.confirmPassword = "Passwords don't match"
   return errors
 }
 
@@ -22,16 +22,33 @@ export default function Register() {
   const navigate = useNavigate()
 
   const [fields, setFields] = useState({
-    firstName: '', lastName: '', username: '', password: '', confirmPassword: '',
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
   })
-  const [errors, setErrors]           = useState({})
-  const [serverError, setServerError] = useState('')
-  const [submitting, setSubmitting]   = useState(false)
+  const [errors, setErrors]                   = useState({})
+  const [serverError, setServerError]         = useState('')
+  const [submitting, setSubmitting]           = useState(false)
+  const [awaitingVerification, setAwaitingVerification] = useState(false)
+  const [resendCooldown, setResendCooldown]   = useState(0)
 
   function handleChange(e) {
     const { name, value } = e.target
     setFields(f => ({ ...f, [name]: value }))
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
+  }
+
+  const handleResend = async () => {
+    try {
+      await api.resendVerificationEmail()
+      setResendCooldown(60)
+      const timer = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) { clearInterval(timer); return 0 }
+          return prev - 1
+        })
+      }, 1000)
+    } catch (err) {
+      setServerError(err.message)
+    }
   }
 
   async function handleSubmit(e) {
@@ -45,9 +62,14 @@ export default function Register() {
       const data = await api.register({
         first_name: fields.firstName.trim(),
         last_name:  fields.lastName.trim(),
-        username:   fields.username.trim(),
+        email:      fields.email.trim(),
         password:   fields.password,
       })
+      if (data.requiresVerification) {
+        setSessionFromResponse(data)
+        setAwaitingVerification(true)
+        return
+      }
       setSessionFromResponse(data)
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -56,6 +78,37 @@ export default function Register() {
       setSubmitting(false)
     }
   }
+
+  if (awaitingVerification) return (
+    <div className="register-page">
+      <div className="register-card">
+        <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+          <p style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📧</p>
+          <h2 style={{ fontWeight: 800, marginBottom: '0.5rem' }}>
+            Check your email
+          </h2>
+          <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            We sent a verification link to <strong>{fields.email}</strong>.
+            Click the link to activate your account.
+          </p>
+          {serverError && <p className="auth-server-error">{serverError}</p>}
+          <button
+            className="register-btn register-btn--primary"
+            onClick={handleResend}
+            disabled={resendCooldown > 0}
+          >
+            {resendCooldown > 0
+              ? `Resend in ${resendCooldown}s`
+              : 'Resend verification email'}
+          </button>
+          <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#666' }}>
+            Already verified?{' '}
+            <a href="/login" style={{ color: '#f97316' }}>Sign in</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="auth-page">
@@ -107,21 +160,18 @@ export default function Register() {
             </div>
 
             <div className="auth-field">
-              <label className="auth-label" htmlFor="reg-username">Username</label>
+              <label className="auth-label" htmlFor="reg-email">Email</label>
               <input
-                id="reg-username"
-                name="username"
-                type="text"
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck="false"
-                className={`auth-input${errors.username ? ' auth-input--error' : ''}`}
-                placeholder="Choose a username"
-                value={fields.username}
+                id="reg-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                className={`auth-input${errors.email ? ' auth-input--error' : ''}`}
+                placeholder="you@example.com"
+                value={fields.email}
                 onChange={handleChange}
               />
-              {errors.username && <span className="auth-field-error">{errors.username}</span>}
+              {errors.email && <span className="auth-field-error">{errors.email}</span>}
             </div>
 
             <div className="auth-field">

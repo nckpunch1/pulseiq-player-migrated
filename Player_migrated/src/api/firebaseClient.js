@@ -1,4 +1,6 @@
 import {
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -35,7 +37,10 @@ function mapAuthError(err) {
     return new ApiError('INVALID_CREDENTIALS', 'Incorrect username or password.')
   }
   if (code === 'auth/email-already-in-use') {
-    return new ApiError('USERNAME_TAKEN', 'That username is already taken.')
+    return new ApiError('EMAIL_TAKEN', 'An account with this email already exists.')
+  }
+  if (code === 'auth/invalid-email') {
+    return new ApiError('INVALID_EMAIL', 'Please enter a valid email address.')
   }
   if (code === 'auth/weak-password') {
     return new ApiError('WEAK_PASSWORD', 'Password is too weak. Choose a stronger one.')
@@ -99,27 +104,27 @@ async function getVenueName(venueId) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function login({ username, password }) {
-  // Look up the user's stored auth-email by their username
-  const q = query(
-    collection(firestore, 'users'),
-    where('username', '==', username),
-    limit(1),
-  )
-  const snap = await getDocs(q)
-  if (snap.empty) {
-    throw new ApiError('INVALID_CREDENTIALS', 'Incorrect username or password.')
-  }
-  const userDoc = snap.docs[0]
-  const userData = userDoc.data()
-  const authEmail = userData.authEmail ?? userData.email
-
-  if (!authEmail) {
-    throw new ApiError('INVALID_CREDENTIALS', 'Incorrect username or password.')
-  }
-
+export async function login({ email, password }) {
+  const normalizedEmail = email.toLowerCase().trim()
   try {
-    const cred = await signInWithEmailAndPassword(auth, authEmail, password)
+    const cred = await signInWithEmailAndPassword(auth, normalizedEmail, password)
+    const userData = await getUserDoc(cred.user.uid)
+
+    const isVerified = cred.user.emailVerified || userData.manuallyVerified === true
+
+    if (!isVerified) {
+      return {
+        player: buildPlayer(cred.user.uid, userData),
+        player_session_token: cred.user.uid,
+        requiresVerification: true,
+      }
+    }
+
+    // Sync emailVerified to Firestore if Firebase confirms it
+    if (cred.user.emailVerified && !userData.emailVerified) {
+      await updateDoc(doc(firestore, 'users', cred.user.uid), { emailVerified: true })
+    }
+
     return {
       player: buildPlayer(cred.user.uid, userData),
       player_session_token: cred.user.uid,
@@ -129,41 +134,43 @@ export async function login({ username, password }) {
   }
 }
 
-export async function register({ first_name, last_name, username, password }) {
-  // Synthetic internal email so Firebase auth is email-based
-  const authEmail = `${username.toLowerCase()}@players.pulseiq.app`
+export async function register({ first_name, last_name, email, password }) {
+  const normalizedEmail = email.toLowerCase().trim()
 
-  let cred
   try {
-    cred = await createUserWithEmailAndPassword(auth, authEmail, password)
+    const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
+    const uid = cred.user.uid
+    const displayName = `${first_name} ${last_name}`.trim()
+
+    await setDoc(doc(firestore, 'users', uid), {
+      email: normalizedEmail,
+      authEmail: normalizedEmail,
+      displayName,
+      firstName: first_name,
+      lastName: last_name,
+      username: normalizedEmail,
+      role: 'player',
+      emailVerified: false,
+      manuallyVerified: false,
+      createdAt: serverTimestamp(),
+    })
+
+    await sendEmailVerification(cred.user)
+
+    return {
+      player: {
+        id: uid,
+        email: normalizedEmail,
+        display_name: displayName,
+        first_name,
+        last_name,
+        emailVerified: false,
+      },
+      player_session_token: uid,
+      requiresVerification: true,
+    }
   } catch (err) {
     throw mapAuthError(err)
-  }
-
-  const uid = cred.user.uid
-  const displayName = `${first_name} ${last_name}`.trim()
-
-  await setDoc(doc(firestore, 'users', uid), {
-    authEmail,
-    email: null,
-    displayName,
-    username,
-    firstName: first_name,
-    lastName: last_name,
-    role: 'player',
-    createdAt: serverTimestamp(),
-  })
-
-  return {
-    player: {
-      id: uid,
-      email: null,
-      display_name: displayName,
-      username,
-      first_name,
-      last_name,
-    },
-    player_session_token: uid,
   }
 }
 
@@ -175,6 +182,21 @@ export async function me() {
 
 export async function logout() {
   await signOut(auth)
+}
+
+export async function resendVerificationEmail() {
+  const user = auth.currentUser
+  if (!user) throw new ApiError('UNAUTHENTICATED', 'Not logged in.')
+  await sendEmailVerification(user)
+}
+
+export async function resetPassword(email) {
+  const normalizedEmail = email.toLowerCase().trim()
+  try {
+    await sendPasswordResetEmail(auth, normalizedEmail)
+  } catch (err) {
+    throw mapAuthError(err)
+  }
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
