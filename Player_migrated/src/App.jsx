@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
-import Login     from './pages/Login.jsx'
-import Register  from './pages/Register.jsx'
+import Login        from './pages/Login.jsx'
+import Register     from './pages/Register.jsx'
+import VerifyPending from './pages/VerifyPending.jsx'
 import Dashboard   from './pages/Dashboard.jsx'
 import Team        from './pages/Team.jsx'
 import Games       from './pages/Games.jsx'
@@ -15,8 +16,10 @@ import MiniGameOverlay  from './components/MiniGameOverlay.jsx'
 // ─── Route guards ─────────────────────────────────────────────────────────────
 
 function ProtectedRoute() {
-  const { isLoggedIn } = useAuth()
-  if (!isLoggedIn) return <Navigate to="/login" replace />
+  const { player, requiresVerification, loading } = useAuth()
+  if (loading) return null
+  if (!player) return <Navigate to="/login" replace />
+  if (requiresVerification) return <Navigate to="/verify-pending" replace />
   return (
     <>
       <MiniGameOverlay />
@@ -54,6 +57,7 @@ export default function App() {
             <Route path="/profile"    element={<Profile />} />
           </Route>
 
+          <Route path="/verify-pending" element={<VerifyPending />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>

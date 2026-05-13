@@ -12,6 +12,8 @@ import {
   register,
   me,
   logout,
+  resendVerificationEmail,
+  resetPassword,
   dashboard,
   getTeam,
   createTeam,
@@ -35,6 +37,8 @@ export const api = {
   register,
   me,
   logout,
+  resendVerificationEmail,
+  resetPassword: (email) => resetPassword(email),
 
   // Dashboard
   dashboard,
