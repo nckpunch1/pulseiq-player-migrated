@@ -361,7 +361,7 @@ export default function LiveGame() {
     return () => unsub()
   }, [gameId, pulseTeamId])
 
-  const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId)
+  const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId, gameId)
   const isPulseActive = pulseSession != null &&
     pulseSession.state !== 'setup' &&
     pulseSession.state !== 'complete'
