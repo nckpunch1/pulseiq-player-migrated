@@ -47,7 +47,7 @@ export default function Team() {
         return
       }
 
-      let currentTeamId = null
+      let currentTeamId = undefined
       let latestTeamDoc = null
       let latestMembersDocs = null
 
