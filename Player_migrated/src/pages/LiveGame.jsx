@@ -413,6 +413,8 @@ export default function LiveGame() {
     : null
 
   // ── Loading skeleton ─────────────────────────────────────────────
+  // timedOut is internal to usePaperLiveGame and not returned by the hook
+  console.log('LiveGame render:', { loading, liveState, timedOut: undefined, lastKnownGoodState, rtdbLoading, detailLoading })
   if (loading) {
     return (
       <div className="lg-page">
@@ -440,7 +442,7 @@ export default function LiveGame() {
           <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
           <div className="lg-header-center">
             <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
-            {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
+            {d?.game?.venue && <p className="lg-game-venue">{d?.game?.venue}</p>}
           </div>
           {gameStatus && <GameStateBadge status={gameStatus} />}
         </header>
@@ -462,7 +464,7 @@ export default function LiveGame() {
           <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
           <div className="lg-header-center">
             <p className="lg-game-title">{d?.game?.title ?? 'Live Game'}</p>
-            {d?.game?.venue && <p className="lg-game-venue">{d.game.venue}</p>}
+            {d?.game?.venue && <p className="lg-game-venue">{d?.game?.venue}</p>}
           </div>
           <GameStateBadge status={gameStatus} />
         </header>
@@ -475,6 +477,17 @@ export default function LiveGame() {
     )
   }
 
+  // ── No RTDB data yet (timeout fired before first snapshot) ──────
+  if (!d) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+        <p style={{ fontSize: '1rem' }}>
+          Waiting for the game to start...
+        </p>
+      </div>
+    )
+  }
+
   // ── Full render ──────────────────────────────────────────────────
   return (
     <div className="lg-page">
@@ -483,8 +496,8 @@ export default function LiveGame() {
       <header className="lg-header">
         <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
         <div className="lg-header-center">
-          <p className="lg-game-title">{d.game?.title}</p>
-          <p className="lg-game-venue">{d.game?.venue}</p>
+          <p className="lg-game-title">{d?.game?.title}</p>
+          <p className="lg-game-venue">{d?.game?.venue}</p>
         </div>
         <GameStateBadge status={gameStatus} />
       </header>
