@@ -402,7 +402,11 @@ export default function LiveGame() {
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .map((entry, i) => ({ ...entry, rank: entry.rank ?? i + 1 }))
     : (Array.isArray(leaderboardRaw) ? leaderboardRaw : [])
-  const roundScores = d?.round_scores ?? []
+  const teamScore = leaderboardRaw?.[pulseTeamId]
+  const roundScores = teamScore?.roundScores
+    ?? d?.roundScores
+    ?? d?.round_scores
+    ?? []
 
   const isLobby = !liveState || liveState === 'lobby'
 
@@ -413,8 +417,6 @@ export default function LiveGame() {
     : null
 
   // ── Loading skeleton ─────────────────────────────────────────────
-  // timedOut is internal to usePaperLiveGame and not returned by the hook
-  console.log('LiveGame render:', { loading, liveState, timedOut: undefined, lastKnownGoodState, rtdbLoading, detailLoading })
   if (loading) {
     return (
       <div className="lg-page">
@@ -473,6 +475,82 @@ export default function LiveGame() {
             Your team is not registered for this game.
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // ── ROUND RESULTS ────────────────────────────────────────────────
+  if (d?.status === 'round_results' || liveState === 'round_results') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        minHeight: '60vh', padding: '2rem',
+        textAlign: 'center', gap: '1.5rem',
+      }}>
+        <p style={{ fontSize: '2.5rem' }}>✅</p>
+        <h2 style={{
+          color: '#fff', fontWeight: 800,
+          fontSize: 'clamp(1.2rem, 5vw, 1.8rem)',
+          margin: 0,
+        }}>
+          Round Complete!
+        </h2>
+        {roundScores.length > 0 && (
+          <div style={{
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: 12, padding: '1rem 1.5rem',
+            width: '100%', maxWidth: 320,
+          }}>
+            {roundScores.map((pts, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '0.4rem 0',
+                borderBottom: i < roundScores.length - 1
+                  ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              }}>
+                <span style={{ color: '#888', fontSize: '0.9rem' }}>
+                  Round {i + 1}
+                </span>
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>
+                  {pts} pts
+                </span>
+              </div>
+            ))}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '0.6rem 0 0',
+              marginTop: '0.4rem',
+              borderTop: '1px solid rgba(249,115,22,0.3)',
+            }}>
+              <span style={{ color: '#f97316', fontWeight: 700 }}>Total</span>
+              <span style={{ color: '#f97316', fontWeight: 800 }}>
+                {roundScores.reduce((a, b) => a + b, 0)} pts
+              </span>
+            </div>
+          </div>
+        )}
+        <p style={{ color: '#555', fontSize: '0.85rem', margin: 0 }}>
+          Waiting for the next round...
+        </p>
+      </div>
+    )
+  }
+
+  // ── GAME COMPLETE (unhandled state fallback) ──────────────────────
+  if (d?.status === 'game_complete' || liveState === 'game_complete') {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+        <p>Waiting for the next round...</p>
+      </div>
+    )
+  }
+
+  // ── WAITING (unhandled state fallback) ────────────────────────────
+  if (d?.status === 'waiting' || liveState === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+        <p>Waiting for the next round...</p>
       </div>
     )
   }
