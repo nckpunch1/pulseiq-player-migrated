@@ -15,6 +15,7 @@ import {
   resendVerificationEmail,
   resetPassword,
   dashboard,
+  getTeamId,
   getTeam,
   createTeam,
   searchTeams,
@@ -29,6 +30,7 @@ import {
   cancelRegistration,
   getPaperLiveState,
   getLeaderboards,
+  listRegions,
   getSeasonLeaderboard,
 } from './firebaseClient'
 
@@ -45,6 +47,7 @@ export const api = {
   dashboard,
 
   // Team
+  getTeamId,
   getTeam,
   createTeam: (teamName) => createTeam(teamName),
   searchTeams: (query) => searchTeams(query),
@@ -63,5 +66,6 @@ export const api = {
 
   // Leaderboard
   getLeaderboards,
+  listRegions,
   getSeasonLeaderboard: (seasonId, regionId) => getSeasonLeaderboard(seasonId, regionId),
 }
