@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { doc, collection, query, onSnapshot } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
@@ -35,139 +36,144 @@ export default function Team() {
   const [leaveBusy, setLeaveBusy] = useState(false)
 
   useEffect(() => {
-    const user = auth.currentUser
-    if (!user) {
-      setPageError('Not logged in.')
-      setLoadState('error')
-      return
-    }
-
     let unsubTeam = null
     let unsubMembers = null
-    let currentTeamId = null
-    let latestTeamDoc = null
-    let latestMembersDocs = null
+    let unsubUser = null
+    let timeout = null
 
-    function rebuildState(teamId) {
-      console.log('rebuildState called:', { teamId, hasTeamDoc: !!latestTeamDoc, hasMembersDocs: !!latestMembersDocs })
-      if (!latestTeamDoc || !latestMembersDocs) return
-      const isCaptain = latestTeamDoc.captainId === user.uid
-      const myMember = latestMembersDocs.find(m => m.userId === user.uid && m.status === 'member')
-      const myRole = myMember?.role ?? 'member'
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        setLoadState('no-team')
+        return
+      }
 
-      const members = latestMembersDocs
-        .filter(m => m.status === 'member')
-        .map(m => ({
-          player_id: m.userId,
-          player_name: m.displayName,
-          username: m.username,
-          is_captain: latestTeamDoc.captainId === m.userId,
-          is_scribe: m.role === 'scribe' || m.role === 'captain',
-          status: 'active',
-        }))
+      let currentTeamId = null
+      let latestTeamDoc = null
+      let latestMembersDocs = null
 
-      setTeamData({
-        team: { id: teamId, name: latestTeamDoc.name, member_count: members.length },
-        membership: {
-          player_id: user.uid,
-          team_id: teamId,
-          is_captain: isCaptain,
-          is_scribe: myRole === 'scribe' || myRole === 'captain',
-        },
-        members,
-      })
+      function rebuildState(teamId) {
+        console.log('rebuildState called:', { teamId, hasTeamDoc: !!latestTeamDoc, hasMembersDocs: !!latestMembersDocs })
+        if (!latestTeamDoc || !latestMembersDocs) return
+        const isCaptain = latestTeamDoc.captainId === firebaseUser.uid
+        const myMember = latestMembersDocs.find(m => m.userId === firebaseUser.uid && m.status === 'member')
+        const myRole = myMember?.role ?? 'member'
 
-      if (isCaptain) {
-        setJoinRequests(
-          latestMembersDocs
-            .filter(m => m.status === 'pending')
-            .map(m => ({
-              id: m.id,
-              team_id: teamId,
-              player_id: m.userId,
-              player_name: m.displayName,
-              player_username: m.username,
-              status: 'pending',
-            }))
+        const members = latestMembersDocs
+          .filter(m => m.status === 'member')
+          .map(m => ({
+            player_id: m.userId,
+            player_name: m.displayName,
+            username: m.username,
+            is_captain: latestTeamDoc.captainId === m.userId,
+            is_scribe: m.role === 'scribe' || m.role === 'captain',
+            status: 'active',
+          }))
+
+        setTeamData({
+          team: { id: teamId, name: latestTeamDoc.name, member_count: members.length },
+          membership: {
+            player_id: firebaseUser.uid,
+            team_id: teamId,
+            is_captain: isCaptain,
+            is_scribe: myRole === 'scribe' || myRole === 'captain',
+          },
+          members,
+        })
+
+        if (isCaptain) {
+          setJoinRequests(
+            latestMembersDocs
+              .filter(m => m.status === 'pending')
+              .map(m => ({
+                id: m.id,
+                team_id: teamId,
+                player_id: m.userId,
+                player_name: m.displayName,
+                player_username: m.username,
+                status: 'pending',
+              }))
+          )
+        }
+
+        setLoadState('has-team')
+      }
+
+      function subscribeToTeam(teamId) {
+        latestTeamDoc = null
+        latestMembersDocs = null
+
+        unsubTeam = onSnapshot(
+          doc(firestore, 'teams', teamId),
+          (snap) => {
+            if (!snap.exists()) {
+              setLoadState('no-team')
+              setTeamData(null)
+              return
+            }
+            latestTeamDoc = snap.data()
+            rebuildState(teamId)
+          },
+          (err) => {
+            setPageError(`Failed to load team (${err.code ?? err.message}). Try refreshing.`)
+            setLoadState('error')
+          }
+        )
+
+        unsubMembers = onSnapshot(
+          query(collection(firestore, 'teams', teamId, 'members')),
+          (snap) => {
+            latestMembersDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            rebuildState(teamId)
+          },
+          (err) => {
+            setPageError(`Failed to load team members (${err.code ?? err.message}). Try refreshing.`)
+            setLoadState('error')
+          }
         )
       }
 
-      setLoadState('has-team')
-    }
-
-    function subscribeToTeam(teamId) {
-      latestTeamDoc = null
-      latestMembersDocs = null
-
-      unsubTeam = onSnapshot(
-        doc(firestore, 'teams', teamId),
+      unsubUser = onSnapshot(
+        doc(firestore, 'users', firebaseUser.uid),
         (snap) => {
-          if (!snap.exists()) {
+          const teamId = snap.data()?.teamId ?? null
+          if (teamId === currentTeamId) return
+          currentTeamId = teamId
+          unsubTeam?.()
+          unsubMembers?.()
+          unsubTeam = null
+          unsubMembers = null
+          if (!teamId) {
+            latestTeamDoc = null
+            latestMembersDocs = null
             setLoadState('no-team')
             setTeamData(null)
+            setJoinRequests([])
             return
           }
-          latestTeamDoc = snap.data()
-          rebuildState(teamId)
+          subscribeToTeam(teamId)
         },
-        (err) => {
-          setPageError(`Failed to load team (${err.code ?? err.message}). Try refreshing.`)
+        (error) => {
+          console.error('unsubUser error:', error.code, error.message)
           setLoadState('error')
+          setPageError(error.message)
         }
       )
 
-      unsubMembers = onSnapshot(
-        query(collection(firestore, 'teams', teamId, 'members')),
-        (snap) => {
-          latestMembersDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          rebuildState(teamId)
-        },
-        (err) => {
-          setPageError(`Failed to load team members (${err.code ?? err.message}). Try refreshing.`)
-          setLoadState('error')
-        }
-      )
-    }
-
-    const unsubUser = onSnapshot(
-      doc(firestore, 'users', user.uid),
-      (snap) => {
-        const teamId = snap.data()?.teamId ?? null
-        if (teamId === currentTeamId) return
-        currentTeamId = teamId
-        unsubTeam?.()
-        unsubMembers?.()
-        unsubTeam = null
-        unsubMembers = null
-        if (!teamId) {
-          latestTeamDoc = null
-          latestMembersDocs = null
-          setLoadState('no-team')
-          setTeamData(null)
-          setJoinRequests([])
-          return
-        }
-        subscribeToTeam(teamId)
-      },
-      (err) => {
-        setPageError(`Failed to load your account (${err.code ?? err.message}). Try refreshing.`)
-        setLoadState('error')
-      }
-    )
-
-    const timeout = setTimeout(() => {
-      setLoadState(prev => {
-        if (prev === 'loading') {
-          setPageError('Team data took too long to load. Please try again.')
-          return 'error'
-        }
-        return prev
-      })
-    }, 8000)
+      timeout = setTimeout(() => {
+        setLoadState(prev => {
+          if (prev === 'loading') {
+            setPageError('Team data took too long to load. Please try again.')
+            return 'error'
+          }
+          return prev
+        })
+      }, 8000)
+    })
 
     return () => {
       clearTimeout(timeout)
-      unsubUser()
+      unsubAuth()
+      unsubUser?.()
       unsubTeam?.()
       unsubMembers?.()
     }
