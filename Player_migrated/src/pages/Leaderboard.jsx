@@ -77,6 +77,7 @@ export default function Leaderboard() {
   }, [teamId])
 
   useEffect(() => {
+    setData(null)
     setLoading(true)
     setError('')
 
@@ -98,7 +99,7 @@ export default function Leaderboard() {
     load()
       .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
       .finally(() => setLoading(false))
-  }, [retryCount, selectedRegionId])
+  }, [tab, retryCount, selectedRegionId])
 
   if (loading || teamId === undefined) {
     return (
