@@ -49,6 +49,7 @@ export default function Team() {
     let latestMembersDocs = null
 
     function rebuildState(teamId) {
+      console.log('rebuildState called:', { teamId, hasTeamDoc: !!latestTeamDoc, hasMembersDocs: !!latestMembersDocs })
       if (!latestTeamDoc || !latestMembersDocs) return
       const isCaptain = latestTeamDoc.captainId === user.uid
       const myMember = latestMembersDocs.find(m => m.userId === user.uid && m.status === 'member')
@@ -154,7 +155,18 @@ export default function Team() {
       }
     )
 
+    const timeout = setTimeout(() => {
+      setLoadState(prev => {
+        if (prev === 'loading') {
+          setPageError('Team data took too long to load. Please try again.')
+          return 'error'
+        }
+        return prev
+      })
+    }, 8000)
+
     return () => {
+      clearTimeout(timeout)
       unsubUser()
       unsubTeam?.()
       unsubMembers?.()
