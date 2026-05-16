@@ -72,9 +72,14 @@ function buildPlayer(uid, userData) {
   }
 }
 
-async function getTeamId(uid) {
+async function resolveTeamId(uid) {
   const userData = await getUserDoc(uid)
   return userData.teamId ?? null
+}
+
+export async function getTeamId() {
+  const user = requireUser()
+  return resolveTeamId(user.uid)
 }
 
 function tsToIso(val) {
@@ -150,6 +155,7 @@ export async function register({ first_name, last_name, email, password }) {
       lastName: last_name,
       username: normalizedEmail,
       role: 'player',
+      teamId: null,
       emailVerified: false,
       manuallyVerified: false,
       createdAt: serverTimestamp(),
@@ -337,9 +343,9 @@ export async function dashboard() {
 
 export async function getTeam() {
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
-
-  if (!teamId) return { team: null, membership: null, members: [] }
+  const userData = await getUserDoc(user.uid)
+  const teamId = userData?.teamId ?? null
+  if (!teamId) return null
 
   const [teamSnap, membersSnap] = await Promise.all([
     getDoc(doc(firestore, 'teams', teamId)),
@@ -481,7 +487,7 @@ export async function getJoinRequests(teamId) {
 export async function handleJoinRequest(memberId, action) {
   // Derive the captain's team from their auth state
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
+  const teamId = await resolveTeamId(user.uid)
   if (!teamId) throw new ApiError('NOT_FOUND', 'You are not on a team.')
 
   const memberRef = doc(firestore, 'teams', teamId, 'members', memberId)
@@ -610,7 +616,7 @@ export async function getGameDetails(sessionId) {
   if (!sessionSnap.exists()) throw new ApiError('NOT_FOUND', 'Game not found.')
   const sessionData = sessionSnap.data()
 
-  const teamId = await getTeamId(user.uid)
+  const teamId = await resolveTeamId(user.uid)
   let teamObj = null
   let membership = null
   let registration = null
@@ -735,7 +741,7 @@ export async function registerForGame(sessionId, teamSize) {
 
 export async function confirmAttendance(sessionId, confirmedTeamSize) {
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
+  const teamId = await resolveTeamId(user.uid)
   if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
 
   await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
@@ -754,7 +760,7 @@ export async function confirmAttendance(sessionId, confirmedTeamSize) {
 
 export async function cancelRegistration(sessionId) {
   const user = requireUser()
-  const teamId = await getTeamId(user.uid)
+  const teamId = await resolveTeamId(user.uid)
   if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
 
   await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
@@ -823,6 +829,11 @@ export async function getLeaderboards() {
   } catch { /* no all-time collection yet */ }
 
   return { current_season, current_season_leaderboard, all_time_leaderboard }
+}
+
+export async function listRegions() {
+  const snap = await getDocs(collection(firestore, 'regions'))
+  return snap.docs.map(d => ({ id: d.id, name: d.data().name }))
 }
 
 export async function getSeasonLeaderboard(seasonId, regionId) {

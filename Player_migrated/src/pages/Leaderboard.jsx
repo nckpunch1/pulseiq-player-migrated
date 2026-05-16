@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './leaderboard.css'
@@ -54,47 +54,38 @@ function LeaderboardTable({ entries, myTeamId }) {
 }
 
 export default function Leaderboard() {
+  const [teamId, setTeamId] = useState(undefined) // undefined = loading
   const [data, setData] = useState(null)
-  const [games, setGames] = useState([])
-  const [myTeamId, setMyTeamId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('season') // season | alltime
   const [retryCount, setRetryCount] = useState(0)
+  const [regions, setRegions] = useState([])
+  const [selectedRegionId, setSelectedRegionId] = useState(null)
 
-  const playerRegion = useMemo(() => {
-    if (!games?.length) return null
-    const sorted = [...games]
-      .filter(g => g.regionId)
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-    return sorted[0]
-      ? { id: sorted[0].regionId, name: sorted[0].regionName }
-      : null
-  }, [games])
+  useEffect(() => {
+    api.getTeamId()
+      .then(id => setTeamId(id ?? null))
+      .catch(() => setTeamId(null))
+  }, [])
+
+  useEffect(() => {
+    if (!teamId) return
+    api.listRegions?.()
+      .then(setRegions)
+      .catch(() => {})
+  }, [teamId])
 
   useEffect(() => {
     setLoading(true)
     setError('')
 
     async function load() {
-      const [lbData, gamesData, teamData] = await Promise.all([
-        api.getLeaderboards(),
-        api.getGames().catch(() => ({ games: [] })),
-        api.getTeam().catch(() => null),
-      ])
-
-      const gs = gamesData?.games ?? []
-      setGames(gs)
-      setMyTeamId(teamData?.team?.id ?? null)
-
-      const sorted = [...gs]
-        .filter(g => g.regionId)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-      const regionId = sorted[0]?.regionId ?? null
+      const lbData = await api.getLeaderboards()
 
       let seasonEntries = []
       if (lbData.current_season) {
-        seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, regionId)
+        seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, selectedRegionId)
       }
 
       setData({
@@ -107,9 +98,9 @@ export default function Leaderboard() {
     load()
       .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
       .finally(() => setLoading(false))
-  }, [retryCount])
+  }, [retryCount, selectedRegionId])
 
-  if (loading) {
+  if (loading || teamId === undefined) {
     return (
       <div className="lb-page">
         <div className="lb-state-fill">
@@ -131,6 +122,32 @@ export default function Leaderboard() {
       </div>
     )
   }
+
+  if (teamId === null) return (
+    <div style={{
+      textAlign: 'center', padding: '3rem 1.5rem',
+      color: '#888'
+    }}>
+      <p style={{ fontSize: '2rem', marginBottom: '1rem' }}>🏆</p>
+      <p style={{ fontWeight: 700, color: '#fff',
+        marginBottom: '0.5rem' }}>
+        Join a team to see the leaderboard
+      </p>
+      <p style={{ fontSize: '0.85rem' }}>
+        Once you're part of a team you'll be able to track
+        your standings here.
+      </p>
+      <a href="/team" style={{
+        display: 'inline-block', marginTop: '1.5rem',
+        background: '#f97316', color: '#000',
+        padding: '0.625rem 1.5rem', borderRadius: 8,
+        fontWeight: 700, textDecoration: 'none',
+        fontSize: '0.875rem',
+      }}>
+        Find a Team
+      </a>
+    </div>
+  )
 
   const { current_season, current_season_leaderboard, all_time_leaderboard } = data
   const entries = tab === 'season' ? (current_season_leaderboard ?? []) : (all_time_leaderboard ?? [])
@@ -162,16 +179,53 @@ export default function Leaderboard() {
         </button>
       </div>
 
-      {tab === 'season' && (
-        <p style={{
-          fontSize: '0.75rem', color: '#888',
-          textAlign: 'center', marginBottom: '0.5rem',
+      {regions.length > 1 && (
+        <div style={{
+          display: 'flex', gap: '0.5rem',
+          overflowX: 'auto', paddingBottom: '0.5rem',
+          marginBottom: '1rem',
         }}>
-          {playerRegion ? `🗺️ ${playerRegion.name} Rankings` : 'All Regions'}
-        </p>
+          <button
+            onClick={() => setSelectedRegionId(null)}
+            style={{
+              padding: '0.375rem 0.875rem', borderRadius: 99,
+              border: '1px solid',
+              borderColor: selectedRegionId === null
+                ? '#f97316' : 'rgba(255,255,255,0.15)',
+              background: selectedRegionId === null
+                ? 'rgba(249,115,22,0.15)' : 'transparent',
+              color: selectedRegionId === null ? '#f97316' : '#888',
+              fontSize: '0.8rem', fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            All Regions
+          </button>
+          {regions.map(r => (
+            <button
+              key={r.id}
+              onClick={() => setSelectedRegionId(r.id)}
+              style={{
+                padding: '0.375rem 0.875rem', borderRadius: 99,
+                border: '1px solid',
+                borderColor: selectedRegionId === r.id
+                  ? '#f97316' : 'rgba(255,255,255,0.15)',
+                background: selectedRegionId === r.id
+                  ? 'rgba(249,115,22,0.15)' : 'transparent',
+                color: selectedRegionId === r.id ? '#f97316' : '#888',
+                fontSize: '0.8rem', fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              📍 {r.name}
+            </button>
+          ))}
+        </div>
       )}
 
-      <LeaderboardTable entries={entries} myTeamId={myTeamId} />
+      <LeaderboardTable entries={entries} myTeamId={teamId} />
 
     </div>
   )
