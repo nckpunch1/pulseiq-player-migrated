@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './leaderboard.css'
@@ -55,23 +55,56 @@ function LeaderboardTable({ entries, myTeamId }) {
 
 export default function Leaderboard() {
   const [data, setData] = useState(null)
+  const [games, setGames] = useState([])
   const [myTeamId, setMyTeamId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('season') // season | alltime
   const [retryCount, setRetryCount] = useState(0)
 
+  const playerRegion = useMemo(() => {
+    if (!games?.length) return null
+    const sorted = [...games]
+      .filter(g => g.regionId)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+    return sorted[0]
+      ? { id: sorted[0].regionId, name: sorted[0].regionName }
+      : null
+  }, [games])
+
   useEffect(() => {
     setLoading(true)
     setError('')
-    Promise.all([
-      api.getLeaderboards(),
-      api.getTeam().catch(() => null),
-    ])
-      .then(([lbData, teamData]) => {
-        setData(lbData)
-        setMyTeamId(teamData?.team?.id ?? null)
+
+    async function load() {
+      const [lbData, gamesData, teamData] = await Promise.all([
+        api.getLeaderboards(),
+        api.getGames().catch(() => ({ games: [] })),
+        api.getTeam().catch(() => null),
+      ])
+
+      const gs = gamesData?.games ?? []
+      setGames(gs)
+      setMyTeamId(teamData?.team?.id ?? null)
+
+      const sorted = [...gs]
+        .filter(g => g.regionId)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+      const regionId = sorted[0]?.regionId ?? null
+
+      let seasonEntries = []
+      if (lbData.current_season) {
+        seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, regionId)
+      }
+
+      setData({
+        current_season: lbData.current_season,
+        current_season_leaderboard: seasonEntries,
+        all_time_leaderboard: lbData.all_time_leaderboard ?? [],
       })
+    }
+
+    load()
       .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
       .finally(() => setLoading(false))
   }, [retryCount])
@@ -128,6 +161,15 @@ export default function Leaderboard() {
           All Time
         </button>
       </div>
+
+      {tab === 'season' && (
+        <p style={{
+          fontSize: '0.75rem', color: '#888',
+          textAlign: 'center', marginBottom: '0.5rem',
+        }}>
+          {playerRegion ? `🗺️ ${playerRegion.name} Rankings` : 'All Regions'}
+        </p>
+      )}
 
       <LeaderboardTable entries={entries} myTeamId={myTeamId} />
 

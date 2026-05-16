@@ -29,6 +29,7 @@ import {
   cancelRegistration,
   getPaperLiveState,
   getLeaderboards,
+  getSeasonLeaderboard,
 } from './firebaseClient'
 
 export const api = {
@@ -62,4 +63,5 @@ export const api = {
 
   // Leaderboard
   getLeaderboards,
+  getSeasonLeaderboard: (seasonId, regionId) => getSeasonLeaderboard(seasonId, regionId),
 }
