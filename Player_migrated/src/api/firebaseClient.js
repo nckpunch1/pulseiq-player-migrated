@@ -595,6 +595,8 @@ export async function getGames() {
       registration_status: regData ? mapAttendanceStatus(regData.attendanceStatus) : 'not_registered',
       team_id: teamId,
       team_name: regData?.teamName ?? null,
+      regionId: data.regionId ?? null,
+      regionName: data.regionName ?? null,
     }
   })
 
@@ -821,4 +823,22 @@ export async function getLeaderboards() {
   } catch { /* no all-time collection yet */ }
 
   return { current_season, current_season_leaderboard, all_time_leaderboard }
+}
+
+export async function getSeasonLeaderboard(seasonId, regionId) {
+  const col = collection(firestore, 'seasons', seasonId, 'leaderboard')
+  const q = regionId ? query(col, where('regionId', '==', regionId)) : query(col)
+  const snap = await getDocs(q)
+  return snap.docs
+    .map(d => {
+      const data = d.data()
+      return {
+        team_id: d.id,
+        team_name: data.teamName,
+        total_points: data.totalPoints ?? 0,
+        games_played: data.gamesPlayed ?? 0,
+        rank: data.rank ?? 0,
+      }
+    })
+    .sort((a, b) => a.rank - b.rank)
 }
