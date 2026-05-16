@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth'
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -813,20 +814,31 @@ export async function getLeaderboards() {
 
   let all_time_leaderboard = []
   try {
-    const atSnap = await getDocs(collection(firestore, 'leaderboard'))
-    all_time_leaderboard = atSnap.docs
-      .map(d => {
-        const data = d.data()
-        return {
-          team_id: d.id,
-          team_name: data.teamName,
-          total_points: data.totalPoints ?? 0,
-          games_played: data.gamesPlayed ?? 0,
-          rank: data.rank ?? 0,
+    const allTimeSnap = await getDocs(
+      collectionGroup(firestore, 'leaderboard')
+    )
+    const teamTotals = {}
+    for (const d of allTimeSnap.docs) {
+      const data = d.data()
+      const teamId = data.teamId ?? data.team_id ?? d.id
+      if (!teamId) continue
+      if (!teamTotals[teamId]) {
+        teamTotals[teamId] = {
+          team_id: teamId,
+          team_name: data.teamName ?? data.team_name ?? 'Unknown',
+          total_points: 0,
+          games_played: 0,
         }
-      })
-      .sort((a, b) => a.rank - b.rank)
-  } catch { /* no all-time collection yet */ }
+      }
+      teamTotals[teamId].total_points +=
+        data.totalPoints ?? data.total_points ?? 0
+      teamTotals[teamId].games_played +=
+        data.gamesPlayed ?? data.games_played ?? 0
+    }
+    all_time_leaderboard = Object.values(teamTotals)
+      .sort((a, b) => b.total_points - a.total_points)
+      .map((entry, i) => ({ ...entry, rank: i + 1 }))
+  } catch { /* no leaderboard subcollections yet */ }
 
   return { current_season, current_season_leaderboard, all_time_leaderboard }
 }
