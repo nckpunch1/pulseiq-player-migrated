@@ -429,7 +429,7 @@ export async function searchTeams(queryStr) {
     query(
       collection(firestore, 'teams'),
       where('nameLower', '>=', q),
-      where('nameLower', '<=', q + ''),
+      where('nameLower', '<=', q + ''),
       limit(20),
     )
   )
