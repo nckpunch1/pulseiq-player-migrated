@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ref, set, serverTimestamp } from 'firebase/database'
+import { ref, set, serverTimestamp as rtdbServerTimestamp } from 'firebase/database'
 import { db } from '../lib/firebase'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
 import { usePulseSession } from '../hooks/usePulseSession'
@@ -30,19 +30,6 @@ function GameStateBadge({ status }) {
   return <span className="lg-badge lg-badge--scheduled">SCHEDULED</span>
 }
 
-function TeamScoreCard({ team, teamScore }) {
-  return (
-    <section className="lg-section">
-      <div className="lg-score-card">
-        <p className="lg-score-team">{team?.name}</p>
-        <p className="lg-score-big">{teamScore?.score ?? 0}</p>
-        {teamScore?.rank && (
-          <span className="lg-rank-tag">RANK #{teamScore.rank}</span>
-        )}
-      </div>
-    </section>
-  )
-}
 
 const GAME_TYPE_LABELS = {
   blitz: 'SUDDEN DEATH BLITZ',
@@ -71,7 +58,7 @@ function PulseTapScreen({ pulseSessionId, teamId, teamName }) {
     if (!pulseSessionId || !teamId || hasTapped) return
     setHasTapped(true)
     const tapRef = ref(db, `pulseSessions/${pulseSessionId}/taps/${teamId}`)
-    await set(tapRef, { teamId, teamName, tappedAt: serverTimestamp() })
+    await set(tapRef, { teamId, teamName, tappedAt: rtdbServerTimestamp() })
   }
 
   return (
@@ -351,6 +338,8 @@ export default function LiveGame() {
   const pulseTeamId = detail?.team?.id ?? liveTeamId
 
   const [pulseTeamScore, setPulseTeamScore] = useState(null)
+  const [raffleEntered, setRaffleEntered] = useState(false)
+  const [raffleLoading, setRaffleLoading] = useState(false)
 
   useEffect(() => {
     if (!gameId || !pulseTeamId) return
@@ -360,6 +349,32 @@ export default function LiveGame() {
     })
     return () => unsub()
   }, [gameId, pulseTeamId])
+
+  useEffect(() => {
+    if (!gameId || !pulseTeamId) return
+    getDoc(doc(firestore, 'sessions', gameId, 'raffleEntries', pulseTeamId))
+      .then(snap => setRaffleEntered(snap.exists()))
+      .catch(() => {})
+  }, [gameId, pulseTeamId])
+
+  const handleRaffleEnter = async () => {
+    if (raffleEntered || raffleLoading) return
+    setRaffleLoading(true)
+    try {
+      await setDoc(
+        doc(firestore, 'sessions', gameId, 'raffleEntries', pulseTeamId),
+        {
+          teamId: pulseTeamId,
+          teamName: detail?.team?.name ?? 'Unknown Team',
+          enteredAt: serverTimestamp(),
+        }
+      )
+      setRaffleEntered(true)
+    } catch (e) {
+      console.error(e)
+    }
+    setRaffleLoading(false)
+  }
 
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId, gameId)
   const isPulseActive = pulseSession != null &&
@@ -504,10 +519,96 @@ export default function LiveGame() {
         </div>
       )}
 
-      {/* ── Team score card — all states except lobby ── */}
+      {/* ── Raffle sign-up ── */}
       {!isPulseActive && !isLobby && (
-        <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
+        <div style={{
+          margin: '1rem 0',
+          padding: '1rem',
+          background: raffleEntered
+            ? 'rgba(34,197,94,0.08)'
+            : 'rgba(249,115,22,0.08)',
+          border: `1px solid ${raffleEntered
+            ? 'rgba(34,197,94,0.25)'
+            : 'rgba(249,115,22,0.25)'}`,
+          borderRadius: 12,
+          textAlign: 'center',
+        }}>
+          {raffleEntered ? (
+            <p style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>
+              🎟️ You're entered in the raffle!
+            </p>
+          ) : (
+            <>
+              <p style={{ color: '#f97316', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                🎟️ Tonight's Raffle
+              </p>
+              <button
+                onClick={handleRaffleEnter}
+                disabled={raffleLoading}
+                style={{
+                  background: '#f97316', color: '#000',
+                  border: 'none', borderRadius: 8,
+                  padding: '0.625rem 1.5rem',
+                  fontWeight: 800, fontSize: '0.875rem',
+                  cursor: raffleLoading ? 'not-allowed' : 'pointer',
+                  opacity: raffleLoading ? 0.6 : 1,
+                }}
+              >
+                {raffleLoading ? 'Entering...' : 'Enter Raffle'}
+              </button>
+            </>
+          )}
+        </div>
       )}
+
+      {/* ── Team score breakdown — all states except lobby ── */}
+      {!isPulseActive && !isLobby && (() => {
+        const rs = d?.round_scores ?? []
+        const total = rs.reduce((a, b) => a + (b.score ?? 0), 0)
+        return (
+          <div style={{
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: 12, overflow: 'hidden',
+            marginTop: '1rem',
+          }}>
+            <p style={{
+              fontSize: '0.7rem', fontWeight: 700,
+              color: '#888', letterSpacing: '0.15em',
+              textTransform: 'uppercase', padding: '0.75rem 1rem 0.5rem',
+              margin: 0,
+            }}>
+              Team Score
+            </p>
+            {rs.map((row, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '0.4rem 1rem',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+              }}>
+                <span style={{ color: '#888', fontSize: '0.85rem' }}>
+                  {row.round_name ?? `Round ${row.round_number ?? i + 1}`}
+                </span>
+                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
+                  {row.score} pts
+                </span>
+              </div>
+            ))}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '0.6rem 1rem',
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(249,115,22,0.08)',
+            }}>
+              <span style={{ color: '#f97316', fontSize: '0.9rem', fontWeight: 700 }}>
+                Total
+              </span>
+              <span style={{ color: '#f97316', fontSize: '0.9rem', fontWeight: 800 }}>
+                {total} pts
+              </span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── ROUND INTRO ── */}
       {!isPulseActive && liveState === 'round_intro' && (
@@ -566,41 +667,19 @@ export default function LiveGame() {
 
       {/* ── ROUND RESULTS ── */}
       {!isPulseActive && liveState === 'round_results' && (
-        <>
-          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
-          {roundScores.length > 0 && (
-            <section className="lg-section">
-              <p className="lg-section-title">ROUND SCORES</p>
-              <div className="lg-round-table">
-                {[...roundScores].reverse().map(rs => (
-                  <div key={rs.round_number} className="lg-round-row">
-                    <span className="lg-round-row-name">{rs.round_name}</span>
-                    <span className="lg-round-row-score">{rs.score}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-          <p className="lg-results-sub">Next round starting soon...</p>
-        </>
+        <p className="lg-results-sub">Next round starting soon...</p>
       )}
 
       {/* ── ROUND RESULTS REVEALED ── */}
       {!isPulseActive && liveState === 'round_results_revealed' && (
-        <>
-          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
-          <p className="lg-results-sub">Next round starting soon...</p>
-        </>
+        <p className="lg-results-sub">Next round starting soon...</p>
       )}
 
       {/* ── LEADERBOARD ── */}
       {!isPulseActive && liveState === 'leaderboard' && (
-        <>
-          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
-          <div className="lg-info-card">
-            Check the big screen for the leaderboard!
-          </div>
-        </>
+        <div className="lg-info-card">
+          Check the big screen for the leaderboard!
+        </div>
       )}
 
       {/* ── FINISHED ── */}
@@ -609,7 +688,6 @@ export default function LiveGame() {
           <div className="lg-gameover">
             <h1 className="lg-gameover-heading">GAME OVER</h1>
           </div>
-          <TeamScoreCard team={detail?.team ?? d?.team} teamScore={d?.leaderboard?.[teamId]} />
           <p className="lg-thanks">Thanks for playing!</p>
           <Link to="/dashboard" className="lg-dash-btn">
             Back to Dashboard
