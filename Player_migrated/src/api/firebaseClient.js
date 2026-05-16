@@ -787,31 +787,26 @@ export function getPaperLiveState(sessionId, onData) {
 // ─── Leaderboards ─────────────────────────────────────────────────────────────
 
 export async function getLeaderboards() {
-  const seasonSnap = await getDocs(
-    query(collection(firestore, 'seasons'), where('status', '==', 'active'), limit(1)),
-  )
-
-  if (seasonSnap.empty) {
-    return { current_season: null, current_season_leaderboard: [], all_time_leaderboard: [] }
+  // 1. Get active season
+  let current_season = null
+  try {
+    const seasonSnap = await getDocs(
+      query(
+        collection(firestore, 'seasons'),
+        where('status', '==', 'active')
+      )
+    )
+    if (!seasonSnap.empty) {
+      current_season = {
+        id: seasonSnap.docs[0].id,
+        ...seasonSnap.docs[0].data()
+      }
+    }
+  } catch (e) {
+    console.error('getLeaderboards season error:', e)
   }
 
-  const seasonDoc = seasonSnap.docs[0]
-  const current_season = { id: seasonDoc.id, name: seasonDoc.data().name, is_active: true }
-
-  const lbSnap = await getDocs(collection(firestore, 'seasons', seasonDoc.id, 'leaderboard'))
-  const current_season_leaderboard = lbSnap.docs
-    .map(d => {
-      const data = d.data()
-      return {
-        team_id: d.id,
-        team_name: data.teamName,
-        total_points: data.totalPoints ?? 0,
-        games_played: data.gamesPlayed ?? 0,
-        rank: data.rank ?? 0,
-      }
-    })
-    .sort((a, b) => a.rank - b.rank)
-
+  // 2. Get all-time leaderboard via collectionGroup
   let all_time_leaderboard = []
   try {
     const allTimeSnap = await getDocs(
@@ -820,7 +815,7 @@ export async function getLeaderboards() {
     const teamTotals = {}
     for (const d of allTimeSnap.docs) {
       const data = d.data()
-      const teamId = data.teamId ?? data.team_id ?? d.id
+      const teamId = data.teamId ?? data.team_id
       if (!teamId) continue
       if (!teamTotals[teamId]) {
         teamTotals[teamId] = {
@@ -837,10 +832,17 @@ export async function getLeaderboards() {
     }
     all_time_leaderboard = Object.values(teamTotals)
       .sort((a, b) => b.total_points - a.total_points)
-      .map((entry, i) => ({ ...entry, rank: i + 1 }))
-  } catch { /* no leaderboard subcollections yet */ }
+      .map((entry, idx) => ({ ...entry, rank: idx + 1 }))
+  } catch (e) {
+    console.error('getLeaderboards all-time error:', e)
+    all_time_leaderboard = []
+  }
 
-  return { current_season, current_season_leaderboard, all_time_leaderboard }
+  return {
+    current_season,
+    current_season_leaderboard: [],  // filled by getSeasonLeaderboard
+    all_time_leaderboard,
+  }
 }
 
 export async function listRegions() {
