@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { doc, collection, query, onSnapshot } from 'firebase/firestore'
+import { doc, collection, query, onSnapshot, addDoc, getDocs, where, serverTimestamp } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
@@ -28,6 +28,10 @@ export default function Team() {
   const [searchError, setSearchError] = useState('')
   const [sentRequests, setSentRequests] = useState({})  // teamId → true when requested
   const [joinBusyId, setJoinBusyId] = useState(null)
+
+  const [teamRequestStatus, setTeamRequestStatus] = useState(null) // null | 'pending' | 'submitting'
+  const [requestNote, setRequestNote] = useState('')
+  const [showRequestForm, setShowRequestForm] = useState(false)
 
   // ── Captain: join request handling
   const [handlingId, setHandlingId] = useState(null)
@@ -178,6 +182,44 @@ export default function Team() {
       unsubMembers?.()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (loadState !== 'no-team') return
+    const user = auth.currentUser
+    if (!user) return
+    getDocs(query(
+      collection(firestore, 'teamRequests'),
+      where('playerId', '==', user.uid),
+      where('status', '==', 'pending')
+    )).then(snap => {
+      if (!snap.empty) setTeamRequestStatus('pending')
+    }).catch(() => {})
+  }, [loadState])
+
+  const handleRequestTeam = async () => {
+    const user = auth.currentUser
+    if (!user) return
+    setTeamRequestStatus('submitting')
+    try {
+      await addDoc(collection(firestore, 'teamRequests'), {
+        playerId: user.uid,
+        playerName: user.displayName ?? 'Unknown',
+        playerEmail: user.email ?? '',
+        note: requestNote.trim(),
+        status: 'pending',
+        resolvedTeamId: null,
+        resolvedTeamName: null,
+        createdAt: serverTimestamp(),
+        resolvedAt: null,
+        resolvedBy: null,
+      })
+      setTeamRequestStatus('pending')
+      setShowRequestForm(false)
+    } catch (e) {
+      console.error(e)
+      setTeamRequestStatus(null)
+    }
+  }
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -389,6 +431,91 @@ export default function Team() {
             )}
           </section>
         )}
+
+        <div style={{
+          marginTop: '2rem',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          paddingTop: '1.5rem',
+        }}>
+          {teamRequestStatus === 'pending' ? (
+            <div style={{
+              background: 'rgba(249,115,22,0.08)',
+              border: '1px solid rgba(249,115,22,0.25)',
+              borderRadius: 12, padding: '1rem',
+              textAlign: 'center',
+            }}>
+              <p style={{ color: '#f97316', fontWeight: 700,
+                marginBottom: '0.25rem' }}>
+                🙋 Request sent!
+              </p>
+              <p style={{ color: '#888', fontSize: '0.82rem' }}>
+                An admin will assign you to a team shortly.
+                Check back here once you've been assigned.
+              </p>
+            </div>
+          ) : showRequestForm ? (
+            <div style={{ space: '1rem' }}>
+              <p style={{ color: '#fff', fontWeight: 700,
+                marginBottom: '0.75rem' }}>
+                Tell us about yourself
+              </p>
+              <textarea
+                placeholder="Optional note — e.g. solo player, happy to join any team"
+                value={requestNote}
+                onChange={e => setRequestNote(e.target.value)}
+                rows={3}
+                style={{
+                  width: '100%', background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 8, padding: '0.75rem',
+                  color: '#fff', fontSize: '0.9rem',
+                  resize: 'none', fontFamily: 'inherit',
+                  marginBottom: '0.75rem',
+                }}
+              />
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={handleRequestTeam}
+                  disabled={teamRequestStatus === 'submitting'}
+                  style={{
+                    flex: 1, background: '#f97316', color: '#000',
+                    border: 'none', borderRadius: 8,
+                    padding: '0.75rem', fontWeight: 800,
+                    cursor: 'pointer', fontSize: '0.9rem',
+                  }}
+                >
+                  {teamRequestStatus === 'submitting'
+                    ? 'Sending...' : 'Send Request'}
+                </button>
+                <button
+                  onClick={() => setShowRequestForm(false)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8, padding: '0.75rem 1rem',
+                    color: '#888', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowRequestForm(true)}
+              style={{
+                width: '100%',
+                background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(249,115,22,0.2)',
+                borderRadius: 12, padding: '0.875rem',
+                color: '#f97316', fontWeight: 700,
+                cursor: 'pointer', fontSize: '0.9rem',
+              }}
+            >
+              🙋 I need a team — ask an admin
+            </button>
+          )}
+        </div>
       </div>
     )
   }
