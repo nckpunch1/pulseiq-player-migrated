@@ -29,6 +29,8 @@ export default function Team() {
   const [sentRequests, setSentRequests] = useState({})  // teamId → true when requested
   const [joinBusyId, setJoinBusyId] = useState(null)
 
+  const [userData, setUserData] = useState(null)
+
   const [teamRequestStatus, setTeamRequestStatus] = useState(null) // null | 'pending' | 'submitting'
   const [requestNote, setRequestNote] = useState('')
   const [showRequestForm, setShowRequestForm] = useState(false)
@@ -139,6 +141,7 @@ export default function Team() {
       unsubUser = onSnapshot(
         doc(firestore, 'users', firebaseUser.uid),
         (snap) => {
+          setUserData(snap.data() ?? null)
           const teamId = snap.data()?.teamId ?? null
           if (teamId === currentTeamId) return
           currentTeamId = teamId
@@ -203,7 +206,11 @@ export default function Team() {
     try {
       await addDoc(collection(firestore, 'teamRequests'), {
         playerId: user.uid,
-        playerName: user.displayName ?? 'Unknown',
+        playerName: auth.currentUser?.displayName
+          ?? userData?.displayName
+          ?? userData?.firstName
+          ?? auth.currentUser?.email?.split('@')[0]
+          ?? 'Unknown',
         playerEmail: user.email ?? '',
         note: requestNote.trim(),
         status: 'pending',
