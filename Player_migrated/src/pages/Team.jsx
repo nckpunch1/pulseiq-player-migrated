@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { doc, collection, query, onSnapshot, addDoc, getDocs, where, serverTimestamp } from 'firebase/firestore'
+import { doc, collection, query, onSnapshot, addDoc, getDocs, updateDoc, where, serverTimestamp } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
@@ -459,6 +459,39 @@ export default function Team() {
                 An admin will assign you to a team shortly.
                 Check back here once you've been assigned.
               </p>
+              <button
+                onClick={async () => {
+                  if (!confirm('Cancel your team request?')) return
+                  const user = auth.currentUser
+                  if (!user) return
+                  try {
+                    const snap = await getDocs(query(
+                      collection(firestore, 'teamRequests'),
+                      where('playerId', '==', user.uid),
+                      where('status', '==', 'pending')
+                    ))
+                    await Promise.all(
+                      snap.docs.map(d => updateDoc(d.ref, {
+                        status: 'cancelled'
+                      }))
+                    )
+                    setTeamRequestStatus(null)
+                  } catch (e) {
+                    console.error(e)
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#555',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  marginTop: '0.5rem',
+                  textDecoration: 'underline',
+                }}
+              >
+                Cancel request
+              </button>
             </div>
           ) : showRequestForm ? (
             <div style={{ space: '1rem' }}>
