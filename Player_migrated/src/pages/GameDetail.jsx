@@ -276,6 +276,11 @@ export default function GameDetail() {
             <span className="gd-meta-label">Date &amp; Time</span>
             <span className="gd-meta-value">{formatGameDate(game.date?.toDate?.())}</span>
           </div>
+          <div className="gd-meta-divider" />
+          <div className="gd-meta-item">
+            <span className="gd-meta-label">Entry Fee</span>
+            <span className="gd-meta-value">$35 per person</span>
+          </div>
         </div>
       </section>
 
