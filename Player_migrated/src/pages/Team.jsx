@@ -34,6 +34,7 @@ export default function Team() {
   const [teamRequestStatus, setTeamRequestStatus] = useState(null) // null | 'pending' | 'submitting'
   const [requestNote, setRequestNote] = useState('')
   const [showRequestForm, setShowRequestForm] = useState(false)
+  const [requestError, setRequestError] = useState('')
 
   // ── Captain: join request handling
   const [handlingId, setHandlingId] = useState(null)
@@ -203,6 +204,7 @@ export default function Team() {
     const user = auth.currentUser
     if (!user) return
     setTeamRequestStatus('submitting')
+    setRequestError('')
     try {
       await addDoc(collection(firestore, 'teamRequests'), {
         playerId: user.uid,
@@ -225,6 +227,7 @@ export default function Team() {
     } catch (e) {
       console.error(e)
       setTeamRequestStatus(null)
+      setRequestError('Failed to send request. Please try again.')
     }
   }
 
@@ -478,6 +481,7 @@ export default function Team() {
                     setTeamRequestStatus(null)
                   } catch (e) {
                     console.error(e)
+                    setRequestError('Failed to cancel. Please try again.')
                   }
                 }}
                 style={{
@@ -492,6 +496,11 @@ export default function Team() {
               >
                 Cancel request
               </button>
+              {requestError && (
+                <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                  {requestError}
+                </p>
+              )}
             </div>
           ) : showRequestForm ? (
             <div style={{ space: '1rem' }}>
@@ -504,6 +513,7 @@ export default function Team() {
                 value={requestNote}
                 onChange={e => setRequestNote(e.target.value)}
                 rows={3}
+                maxLength={200}
                 style={{
                   width: '100%', background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(255,255,255,0.12)',
@@ -513,6 +523,11 @@ export default function Team() {
                   marginBottom: '0.75rem',
                 }}
               />
+              {requestError && (
+                <p style={{ color: '#f87171', fontSize: '0.82rem', marginBottom: '0.5rem' }}>
+                  {requestError}
+                </p>
+              )}
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
                   onClick={handleRequestTeam}

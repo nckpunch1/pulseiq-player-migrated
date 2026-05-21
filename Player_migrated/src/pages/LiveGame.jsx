@@ -340,6 +340,7 @@ export default function LiveGame() {
   const [pulseTeamScore, setPulseTeamScore] = useState(null)
   const [raffleEntered, setRaffleEntered] = useState(false)
   const [raffleLoading, setRaffleLoading] = useState(false)
+  const [raffleError, setRaffleError] = useState('')
 
   useEffect(() => {
     if (!gameId || !pulseTeamId) return
@@ -360,6 +361,7 @@ export default function LiveGame() {
   const handleRaffleEnter = async () => {
     if (raffleEntered || raffleLoading) return
     setRaffleLoading(true)
+    setRaffleError('')
     try {
       await setDoc(
         doc(firestore, 'sessions', gameId, 'raffleEntries', pulseTeamId),
@@ -372,8 +374,10 @@ export default function LiveGame() {
       setRaffleEntered(true)
     } catch (e) {
       console.error(e)
+      setRaffleError('Failed to enter raffle. Please try again.')
+    } finally {
+      setRaffleLoading(false)
     }
-    setRaffleLoading(false)
   }
 
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId, gameId)
@@ -647,6 +651,11 @@ export default function LiveGame() {
               >
                 {raffleLoading ? 'Entering...' : 'Enter Raffle'}
               </button>
+              {raffleError && (
+                <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: '0.5rem', margin: '0.5rem 0 0' }}>
+                  {raffleError}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -655,6 +664,7 @@ export default function LiveGame() {
       {/* ── Team score breakdown — all states except lobby ── */}
       {!isPulseActive && !isLobby && (() => {
         const rs = d?.round_scores ?? []
+        if (!rs.length) return null
         const total = rs.reduce((a, b) => a + (b.score ?? 0), 0)
         return (
           <div style={{
