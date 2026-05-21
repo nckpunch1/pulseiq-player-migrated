@@ -47,6 +47,7 @@ export default function Team() {
     let unsubMembers = null
     let unsubUser = null
     let unsubMemberWatch = null
+    let memberPollInterval = null
     let timeout = null
 
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -105,6 +106,7 @@ export default function Team() {
           )
         }
 
+        clearInterval(memberPollInterval)
         setLoadState('has-team')
       }
 
@@ -198,6 +200,32 @@ export default function Team() {
         }
       })
 
+      memberPollInterval = setInterval(async () => {
+        try {
+          const snap = await getDocs(query(
+            collectionGroup(firestore, 'members'),
+            where('userId', '==', firebaseUser.uid)
+          ))
+          if (snap.empty) return
+          const memberDoc = snap.docs[0]
+          const foundTeamId = memberDoc.ref.parent.parent.id
+          const userSnap = await getDoc(
+            doc(firestore, 'users', firebaseUser.uid)
+          )
+          if (userSnap.data()?.teamId === foundTeamId) {
+            clearInterval(memberPollInterval)
+            return
+          }
+          await updateDoc(
+            doc(firestore, 'users', firebaseUser.uid),
+            { teamId: foundTeamId }
+          )
+          clearInterval(memberPollInterval)
+        } catch (e) {
+          // Silent — will retry next interval
+        }
+      }, 15000)
+
       timeout = setTimeout(() => {
         setLoadState(prev => {
           if (prev === 'loading') {
@@ -212,6 +240,7 @@ export default function Team() {
     return () => {
       clearTimeout(timeout)
       unsubAuth()
+      clearInterval(memberPollInterval)
       unsubUser?.()
       unsubMemberWatch?.()
       unsubTeam?.()
@@ -614,6 +643,37 @@ export default function Team() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={async () => {
+            try {
+              const snap = await getDocs(query(
+                collectionGroup(firestore, 'members'),
+                where('userId', '==', auth.currentUser?.uid)
+              ))
+              if (snap.empty) return
+              const memberDoc = snap.docs[0]
+              const foundTeamId = memberDoc.ref.parent.parent.id
+              await updateDoc(
+                doc(firestore, 'users', auth.currentUser.uid),
+                { teamId: foundTeamId }
+              )
+            } catch (e) {
+              console.error(e)
+            }
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#555',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            marginTop: '1rem',
+            textDecoration: 'underline',
+          }}
+        >
+          Been approved? Tap to refresh
+        </button>
       </div>
     )
   }
