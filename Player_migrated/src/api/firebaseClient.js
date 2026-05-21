@@ -840,6 +840,7 @@ export async function getLeaderboards() {
     const teamTotals = {}
     for (const d of allTimeSnap.docs) {
       const data = d.data()
+      if (data.archived) continue
       // Try data field first, fall back to extracting
       // from doc ID (old format: just teamId,
       // new format: teamId_regionId)
@@ -894,5 +895,6 @@ export async function getSeasonLeaderboard(seasonId, regionId) {
         rank: data.rank ?? 0,
       }
     })
+    .filter(entry => !entry.archived)
     .sort((a, b) => a.rank - b.rank)
 }
