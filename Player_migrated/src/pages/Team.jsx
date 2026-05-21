@@ -175,31 +175,28 @@ export default function Team() {
         where('userId', '==', firebaseUser.uid)
       )
 
-      unsubMemberWatch = onSnapshot(
-        membersQuery,
-        async (snap) => {
-          if (snap.empty) return
-
+      let processingMemberWatch = false
+      unsubMemberWatch = onSnapshot(membersQuery, async (snap) => {
+        if (snap.empty || processingMemberWatch) return
+        processingMemberWatch = true
+        try {
           const memberDoc = snap.docs[0]
           const teamId = memberDoc.ref.parent.parent.id
-
           const currentSnap = await getDoc(
             doc(firestore, 'users', firebaseUser.uid)
           )
           if (currentSnap.data()?.teamId === teamId) return
-
           await updateDoc(
             doc(firestore, 'users', firebaseUser.uid),
             { teamId }
           )
-          // unsubUser listener fires automatically and transitions no-team → has-team
           unsubMemberWatch?.()
-          unsubMemberWatch = null
-        },
-        (error) => {
-          console.error('Member watch error:', error.code)
+        } catch (e) {
+          console.error('Member watch error:', e)
+        } finally {
+          processingMemberWatch = false
         }
-      )
+      })
 
       timeout = setTimeout(() => {
         setLoadState(prev => {
@@ -301,6 +298,17 @@ export default function Team() {
   }
 
   async function handleJoin(teamId) {
+    const firebaseUser = auth.currentUser
+    if (!firebaseUser) return
+    // Prevent duplicate requests
+    const existing = await getDocs(query(
+      collection(firestore, 'teams', teamId, 'members'),
+      where('userId', '==', firebaseUser.uid)
+    ))
+    if (!existing.empty) {
+      setSentRequests(prev => ({ ...prev, [teamId]: true }))
+      return
+    }
     setJoinBusyId(teamId)
     try {
       await api.requestToJoin(teamId)
