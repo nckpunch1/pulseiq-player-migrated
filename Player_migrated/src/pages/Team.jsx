@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { doc, collection, query, onSnapshot, addDoc, getDocs, updateDoc, where, serverTimestamp } from 'firebase/firestore'
+import { doc, collection, query, onSnapshot, addDoc, getDocs, getDoc, updateDoc, where, serverTimestamp, collectionGroup } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
@@ -46,6 +46,7 @@ export default function Team() {
     let unsubTeam = null
     let unsubMembers = null
     let unsubUser = null
+    let unsubMemberWatch = null
     let timeout = null
 
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -167,6 +168,35 @@ export default function Team() {
         }
       )
 
+      const membersQuery = query(
+        collectionGroup(firestore, 'members'),
+        where('userId', '==', firebaseUser.uid)
+      )
+
+      unsubMemberWatch = onSnapshot(
+        membersQuery,
+        async (snap) => {
+          if (snap.empty) return
+
+          const memberDoc = snap.docs[0]
+          const teamId = memberDoc.ref.parent.parent.id
+
+          const currentSnap = await getDoc(
+            doc(firestore, 'users', firebaseUser.uid)
+          )
+          if (currentSnap.data()?.teamId === teamId) return
+
+          await updateDoc(
+            doc(firestore, 'users', firebaseUser.uid),
+            { teamId }
+          )
+          // unsubUser listener fires automatically and transitions no-team → has-team
+        },
+        (error) => {
+          console.error('Member watch error:', error.code)
+        }
+      )
+
       timeout = setTimeout(() => {
         setLoadState(prev => {
           if (prev === 'loading') {
@@ -182,6 +212,7 @@ export default function Team() {
       clearTimeout(timeout)
       unsubAuth()
       unsubUser?.()
+      unsubMemberWatch?.()
       unsubTeam?.()
       unsubMembers?.()
     }
