@@ -146,6 +146,20 @@ export default function Games() {
                   </div>
                   <p className="games-card-venue">{game.venue}</p>
                   <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: 'rgba(249,115,22,0.12)',
+                    border: '1px solid rgba(249,115,22,0.3)',
+                    color: '#f97316',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    padding: '2px 10px',
+                    borderRadius: 99,
+                    letterSpacing: '0.02em',
+                  }}>
+                    $35 per team
+                  </span>
                   {game.team_name && (
                     <div className="games-card-footer">
                       <span className="games-card-team">Team: {game.team_name}</span>
