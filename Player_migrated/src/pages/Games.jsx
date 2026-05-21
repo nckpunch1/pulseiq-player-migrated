@@ -158,7 +158,7 @@ export default function Games() {
                     borderRadius: 99,
                     letterSpacing: '0.02em',
                   }}>
-                    $35 per team
+                    $35 per person
                   </span>
                   {game.team_name && (
                     <div className="games-card-footer">
