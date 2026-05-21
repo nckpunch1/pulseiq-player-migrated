@@ -167,7 +167,7 @@ export default function Login() {
           <span className="auth-logo-iq">IQ</span>
         </p>
         <p className="auth-tagline">Test your knowledge. Beat your mates.</p>
-        <h1 className="auth-title">Welcome back</h1>
+        <h1 className="auth-title">Welcome</h1>
         <p className="auth-subtitle">Sign in to your player account</p>
 
         {serverError && <p className="auth-server-error">{serverError}</p>}
