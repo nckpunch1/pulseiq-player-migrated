@@ -5,9 +5,7 @@ import { db } from '../lib/firebase'
 /**
  * Subscribes to the active Pulse mini game session.
  *
- * Only activates when teamId is non-null (player has a team identity).
- * If knownSessionId is provided, subscribes directly to that session;
- * otherwise scans pulseSessions/ for the first session where state !== 'setup'.
+ * Only activates when teamId and knownSessionId are both non-null.
  */
 export function usePulseSession(teamId, knownSessionId = null) {
   const [sessionId, setSessionId] = useState(null)
@@ -20,28 +18,7 @@ export function usePulseSession(teamId, knownSessionId = null) {
       setSessionData(null)
       return
     }
-
-    if (knownSessionId) {
-      setSessionId(knownSessionId)
-      return
-    }
-
-    const pulsesRef = ref(db, 'pulseSessions')
-    const unsub = onValue(
-      pulsesRef,
-      (snap) => {
-        const sessions = snap.val() ?? {}
-        const activeId =
-          Object.entries(sessions).find(
-            ([, s]) => s?.state && s.state !== 'setup' && s.state !== 'complete'
-          )?.[0] ?? null
-        setSessionId(activeId)
-      },
-      (err) => {
-        if (import.meta.env.DEV) console.warn('[Pulse] pulseSessions error:', err.message)
-      },
-    )
-    return unsub
+    setSessionId(knownSessionId ?? null)
   }, [teamId, knownSessionId])
 
   // Step 2 — watch the full session once we have a sessionId
