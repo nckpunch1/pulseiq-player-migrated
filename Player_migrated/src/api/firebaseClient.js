@@ -812,31 +812,31 @@ export function getPaperLiveState(sessionId, onData) {
 // ─── Leaderboards ─────────────────────────────────────────────────────────────
 
 export async function getLeaderboards() {
-  // 1. Get active season
+  // Both reads are independent — fire them in parallel.
+  // Each has its own .catch() so one failure doesn't suppress the other.
+  // NOTE: collectionGroup('leaderboard') requires the 'leaderboard' collection group
+  // to be enabled in Firestore Console (Indexes → Collection group tab) or it will
+  // silently return empty results via the catch below.
+  // Read cost: 1 (seasons) + N_seasons × N_teams (all leaderboard docs), e.g. 101 reads
+  // for 5 seasons × 20 teams. No in-memory cache — re-fetched on every page mount.
+  const [seasonSnap, allTimeSnap] = await Promise.all([
+    getDocs(query(collection(firestore, 'seasons'), where('status', '==', 'active'))).catch(e => {
+      console.error('getLeaderboards season error:', e)
+      return null
+    }),
+    getDocs(collectionGroup(firestore, 'leaderboard')).catch(e => {
+      console.error('getLeaderboards all-time error:', e)
+      return null
+    }),
+  ])
+
   let current_season = null
-  try {
-    const seasonSnap = await getDocs(
-      query(
-        collection(firestore, 'seasons'),
-        where('status', '==', 'active')
-      )
-    )
-    if (!seasonSnap.empty) {
-      current_season = {
-        id: seasonSnap.docs[0].id,
-        ...seasonSnap.docs[0].data()
-      }
-    }
-  } catch (e) {
-    console.error('getLeaderboards season error:', e)
+  if (seasonSnap && !seasonSnap.empty) {
+    current_season = { id: seasonSnap.docs[0].id, ...seasonSnap.docs[0].data() }
   }
 
-  // 2. Get all-time leaderboard via collectionGroup
   let all_time_leaderboard = []
-  try {
-    const allTimeSnap = await getDocs(
-      collectionGroup(firestore, 'leaderboard')
-    )
+  if (allTimeSnap) {
     const teamTotals = {}
     for (const d of allTimeSnap.docs) {
       const data = d.data()
@@ -850,22 +850,17 @@ export async function getLeaderboards() {
           games_played: 0,
         }
       }
-      teamTotals[teamId].total_points +=
-        data.totalPoints ?? data.total_points ?? 0
-      teamTotals[teamId].games_played +=
-        data.gamesPlayed ?? data.games_played ?? 0
+      teamTotals[teamId].total_points += data.totalPoints ?? data.total_points ?? 0
+      teamTotals[teamId].games_played += data.gamesPlayed ?? data.games_played ?? 0
     }
     all_time_leaderboard = Object.values(teamTotals)
       .sort((a, b) => b.total_points - a.total_points)
       .map((entry, idx) => ({ ...entry, rank: idx + 1 }))
-  } catch (e) {
-    console.error('getLeaderboards all-time error:', e)
-    all_time_leaderboard = []
   }
 
   return {
     current_season,
-    current_season_leaderboard: [],  // filled by getSeasonLeaderboard
+    current_season_leaderboard: [],
     all_time_leaderboard,
   }
 }
