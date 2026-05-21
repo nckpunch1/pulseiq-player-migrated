@@ -583,9 +583,18 @@ export async function getGames() {
     })
   )
 
-  const games = sessionDocs.map((d, i) => {
+  // Filter out private sessions the team isn't registered for
+  const visiblePairs = sessionDocs
+    .map((d, i) => [d, registrationSnaps[i]])
+    .filter(([d, regSnap]) => {
+      const vis = d.data().visibility
+      if (!vis || vis === 'public') return true
+      if (vis === 'private') return !regSnap.empty
+      return true
+    })
+
+  const games = visiblePairs.map(([d, regSnap]) => {
     const data = d.data()
-    const regSnap = registrationSnaps[i]
     const regData = !regSnap.empty ? regSnap.docs[0]?.data() : null
     const venueName = (data.venueId ? (venueMap.get(data.venueId) ?? '') : '') || data.venue || ''
 
