@@ -837,20 +837,19 @@ export async function getLeaderboards() {
 
   let all_time_leaderboard = []
   if (allTimeSnap) {
-    // Temporary diagnostic — remove after checking
-    console.log('collectionGroup leaderboard docs:',
-      allTimeSnap.size,
-      allTimeSnap.docs.map(d => ({
-        id: d.id,
-        path: d.ref.path,
-        teamId: d.data().teamId,
-        totalPoints: d.data().totalPoints,
-      }))
-    )
     const teamTotals = {}
     for (const d of allTimeSnap.docs) {
       const data = d.data()
-      const teamId = data.teamId ?? data.team_id
+      // Try data field first, fall back to extracting
+      // from doc ID (old format: just teamId,
+      // new format: teamId_regionId)
+      const docId = d.id
+      const teamId = data.teamId
+        ?? data.team_id
+        ?? (docId.includes('_')
+            ? docId.split('_')[0]
+            : docId)
+
       if (!teamId) continue
       if (!teamTotals[teamId]) {
         teamTotals[teamId] = {
