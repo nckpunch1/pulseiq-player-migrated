@@ -255,10 +255,21 @@ export async function dashboard() {
         )
       : sessionDocs.map(() => ({ empty: true, docs: [] }))
 
-    for (let i = 0; i < sessionDocs.length; i++) {
-      const sessDoc = sessionDocs[i]
+    const visibleSessions = sessionDocs.filter(sessDoc => {
       const sessData = sessDoc.data()
-      const regSnap = registrationSnaps[i]
+      if (!sessData.visibility || sessData.visibility === 'public') return true
+      if (sessData.visibility === 'private') {
+        return registrationSnaps.some((regSnap, i) => {
+          return sessionDocs[i].id === sessDoc.id && !regSnap.empty
+        })
+      }
+      return true
+    })
+
+    for (const sessDoc of visibleSessions) {
+      const origIdx = sessionDocs.findIndex(d => d.id === sessDoc.id)
+      const sessData = sessDoc.data()
+      const regSnap = registrationSnaps[origIdx]
       const regData = regSnap.empty ? null : regSnap.docs[0]?.data()
       upcoming_games.push({
         id: sessDoc.id,
@@ -311,22 +322,27 @@ export async function dashboard() {
       }
     } catch { /* non-critical */ }
   } else {
-    // No team — just list sessions without registration status
-    sessSnap.forEach(d => {
-      const data = d.data()
-      upcoming_games.push({
-        id: d.id,
-        canonical_session_id: d.id,
-        name: data.name ?? '',
-        title: data.title,
-        venue: data.venue,
-        date: data.date ?? data.startsAt,
-        starts_at: tsToIso(data.startsAt),
-        status: data.status,
-        registration_status: 'not_registered',
-        team_name: null,
+    // No team — list only public sessions without registration status
+    sessSnap.docs
+      .filter(d => {
+        const vis = d.data().visibility
+        return !vis || vis === 'public'
       })
-    })
+      .forEach(d => {
+        const data = d.data()
+        upcoming_games.push({
+          id: d.id,
+          canonical_session_id: d.id,
+          name: data.name ?? '',
+          title: data.title,
+          venue: data.venue,
+          date: data.date ?? data.startsAt,
+          starts_at: tsToIso(data.startsAt),
+          status: data.status,
+          registration_status: 'not_registered',
+          team_name: null,
+        })
+      })
   }
 
   return {
