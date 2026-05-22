@@ -614,8 +614,8 @@ export default function LiveGame() {
         </div>
       )}
 
-      {/* ── Raffle sign-up ── */}
-      {!isPulseActive && !isLobby && (
+      {/* ── Raffle sign-up ── (hidden - re-enable by removing `false &&`) */}
+      {false && !isPulseActive && !isLobby && (
         <div style={{
           margin: '1rem 0',
           padding: '1rem',
