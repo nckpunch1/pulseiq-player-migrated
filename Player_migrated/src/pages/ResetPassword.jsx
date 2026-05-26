@@ -4,7 +4,7 @@ import {
   verifyPasswordResetCode,
   confirmPasswordReset
 } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { auth } from '../lib/firebase'
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
