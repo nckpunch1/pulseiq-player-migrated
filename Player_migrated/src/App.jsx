@@ -18,7 +18,7 @@ const GameDetail   = lazy(() => import('./pages/GameDetail.jsx'))
 const LiveGame     = lazy(() => import('./pages/LiveGame.jsx'))
 const Leaderboard  = lazy(() => import('./pages/Leaderboard.jsx'))
 const Profile      = lazy(() => import('./pages/Profile.jsx'))
-const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'))
+const AuthAction    = lazy(() => import('./pages/AuthAction.jsx'))
 
 const pageFallback = (
   <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -73,7 +73,7 @@ export default function App() {
 
             <Route path="/verify-pending"  element={<VerifyPending />} />
             <Route path="/verification"    element={<Verification />} />
-            <Route path="/reset-password"  element={<ResetPassword />} />
+            <Route path="/action"          element={<AuthAction />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>
