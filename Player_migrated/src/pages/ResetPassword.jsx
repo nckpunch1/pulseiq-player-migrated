@@ -9,6 +9,7 @@ import { auth } from '../lib/firebase'
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const mode = searchParams.get('mode')
   const oobCode = searchParams.get('oobCode')
 
   const [email, setEmail] = useState('')
@@ -20,6 +21,19 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
+    // Redirect verification emails to correct handler
+    if (mode === 'verifyEmail') {
+      navigate(
+        `/verify?mode=${mode}&oobCode=${oobCode}`,
+        { replace: true }
+      )
+      return
+    }
+    if (mode !== 'resetPassword') {
+      navigate('/', { replace: true })
+      return
+    }
+    // existing verifyPasswordResetCode logic below...
     if (!oobCode) {
       setError('Invalid reset link.')
       setVerifying(false)
@@ -34,7 +48,7 @@ export default function ResetPassword() {
         setError('This reset link has expired or already been used.')
         setVerifying(false)
       })
-  }, [oobCode])
+  }, [mode, oobCode])
 
   const handleReset = async () => {
     if (!password) return
