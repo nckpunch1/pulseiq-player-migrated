@@ -5,7 +5,7 @@ import {
   confirmPasswordReset,
   applyActionCode,
 } from 'firebase/auth'
-import { auth } from '../api/firebaseClient'
+import { auth } from '../lib/firebase'
 
 export default function AuthAction() {
   const [searchParams] = useSearchParams()
