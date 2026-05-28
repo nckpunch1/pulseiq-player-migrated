@@ -80,8 +80,8 @@ export default function Register() {
   }
 
   if (awaitingVerification) return (
-    <div className="register-page">
-      <div className="register-card">
+    <div className="auth-page">
+      <div className="auth-card">
         <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
           <p style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📧</p>
           <h2 style={{ fontWeight: 800, marginBottom: '0.5rem' }}>
@@ -93,7 +93,7 @@ export default function Register() {
           </p>
           {serverError && <p className="auth-server-error">{serverError}</p>}
           <button
-            className="register-btn register-btn--primary"
+            className="auth-btn auth-btn--primary"
             onClick={handleResend}
             disabled={resendCooldown > 0}
           >

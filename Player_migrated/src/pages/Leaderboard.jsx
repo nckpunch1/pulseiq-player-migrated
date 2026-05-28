@@ -99,7 +99,7 @@ export default function Leaderboard() {
     load()
       .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
       .finally(() => setLoading(false))
-  }, [tab, retryCount, selectedRegionId])
+  }, [retryCount, selectedRegionId])
 
   if (loading || teamId === undefined) {
     return (

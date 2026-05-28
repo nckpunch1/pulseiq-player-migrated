@@ -187,7 +187,10 @@ export default function Team() {
           const currentSnap = await getDoc(
             doc(firestore, 'users', firebaseUser.uid)
           )
-          if (currentSnap.data()?.teamId === teamId) return
+          if (currentSnap.data()?.teamId === teamId) {
+            unsubMemberWatch?.()
+            return
+          }
           await updateDoc(
             doc(firestore, 'users', firebaseUser.uid),
             { teamId }
@@ -392,8 +395,20 @@ export default function Team() {
   if (loadState === 'error') {
     return (
       <div className="team-page">
+        <header className="team-header">
+          <Link to="/dashboard" className="team-back">← Dashboard</Link>
+          <p className="team-wordmark">PulseIQ</p>
+          <h1 className="team-page-title">Your Team</h1>
+        </header>
         <div className="team-state-fill">
           <div className="team-error-box">{pageError}</div>
+          <button
+            className="team-btn team-btn--primary"
+            style={{ marginTop: '12px' }}
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
         </div>
       </div>
     )
@@ -564,6 +579,10 @@ export default function Team() {
                   cursor: 'pointer',
                   marginTop: '0.5rem',
                   textDecoration: 'underline',
+                  minHeight: '44px',
+                  padding: '0 0.5rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                 }}
               >
                 Cancel request
@@ -590,7 +609,7 @@ export default function Team() {
                   width: '100%', background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: 8, padding: '0.75rem',
-                  color: '#fff', fontSize: '0.9rem',
+                  color: '#fff', fontSize: '1rem',
                   resize: 'none', fontFamily: 'inherit',
                   marginBottom: '0.75rem',
                 }}
@@ -607,7 +626,7 @@ export default function Team() {
                   style={{
                     flex: 1, background: '#f97316', color: '#000',
                     border: 'none', borderRadius: 8,
-                    padding: '0.75rem', fontWeight: 800,
+                    padding: '0.875rem', fontWeight: 800,
                     cursor: 'pointer', fontSize: '0.9rem',
                   }}
                 >
@@ -619,7 +638,7 @@ export default function Team() {
                   style={{
                     background: 'transparent',
                     border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 8, padding: '0.75rem 1rem',
+                    borderRadius: 8, padding: '0.875rem 1rem',
                     color: '#888', cursor: 'pointer',
                   }}
                 >
@@ -670,6 +689,10 @@ export default function Team() {
             cursor: 'pointer',
             marginTop: '1rem',
             textDecoration: 'underline',
+            minHeight: '44px',
+            padding: '0 0.5rem',
+            display: 'inline-flex',
+            alignItems: 'center',
           }}
         >
           Been approved? Tap to refresh

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ref, set, serverTimestamp as rtdbServerTimestamp } from 'firebase/database'
 import { db } from '../lib/firebase'
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { usePaperLiveGame } from '../hooks/usePaperLiveGame'
 import { usePulseSession } from '../hooks/usePulseSession'
@@ -318,12 +318,14 @@ export default function LiveGame() {
 
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(true)
+  const [detailError, setDetailError] = useState(false)
 
   useEffect(() => {
     if (!gameId) return
+    setDetailError(false)
     api.getGameDetails(gameId)
       .then(data => setDetail(data))
-      .catch(() => {})
+      .catch(() => setDetailError(true))
       .finally(() => setDetailLoading(false))
   }, [gameId])
 
@@ -338,9 +340,6 @@ export default function LiveGame() {
   const pulseTeamId = detail?.team?.id ?? liveTeamId
 
   const [pulseTeamScore, setPulseTeamScore] = useState(null)
-  const [raffleEntered, setRaffleEntered] = useState(false)
-  const [raffleLoading, setRaffleLoading] = useState(false)
-  const [raffleError, setRaffleError] = useState('')
 
   useEffect(() => {
     if (!gameId || !pulseTeamId) return
@@ -350,35 +349,6 @@ export default function LiveGame() {
     })
     return () => unsub()
   }, [gameId, pulseTeamId])
-
-  useEffect(() => {
-    if (!gameId || !pulseTeamId) return
-    getDoc(doc(firestore, 'sessions', gameId, 'raffleEntries', pulseTeamId))
-      .then(snap => setRaffleEntered(snap.exists()))
-      .catch(() => {})
-  }, [gameId, pulseTeamId])
-
-  const handleRaffleEnter = async () => {
-    if (raffleEntered || raffleLoading) return
-    setRaffleLoading(true)
-    setRaffleError('')
-    try {
-      await setDoc(
-        doc(firestore, 'sessions', gameId, 'raffleEntries', pulseTeamId),
-        {
-          teamId: pulseTeamId,
-          teamName: detail?.team?.name ?? 'Unknown Team',
-          enteredAt: serverTimestamp(),
-        }
-      )
-      setRaffleEntered(true)
-    } catch (e) {
-      console.error(e)
-      setRaffleError('Failed to enter raffle. Please try again.')
-    } finally {
-      setRaffleLoading(false)
-    }
-  }
 
   const { sessionData: pulseSession, sessionId: pulseSessionId } = usePulseSession(pulseTeamId, gameId)
   const isPulseActive = pulseSession != null &&
@@ -419,6 +389,35 @@ export default function LiveGame() {
   const secsAgo = lastUpdatedAt
     ? Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000)
     : null
+
+  // ── Detail fetch error ───────────────────────────────────────────
+  if (detailError) {
+    return (
+      <div className="lg-page">
+        <header className="lg-header">
+          <Link to={`/games/${gameId}`} className="lg-back">← Back</Link>
+          <div className="lg-header-center">
+            <p className="lg-game-title">Live Game</p>
+          </div>
+        </header>
+        <div className="lg-state-fill">
+          <div className="lg-info-card">
+            Couldn&apos;t load game details. Please check your connection and try again.
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '1rem', background: '#f97316', color: '#000',
+              border: 'none', borderRadius: 8, padding: '0.625rem 1.5rem',
+              fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer',
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Loading skeleton ─────────────────────────────────────────────
   if (loading) {
@@ -611,53 +610,6 @@ export default function LiveGame() {
           <span className="lg-waiting-icon">⚡</span>
           <p className="lg-waiting-title">Waiting for host to start the game</p>
           <p className="lg-waiting-sub">This screen updates automatically</p>
-        </div>
-      )}
-
-      {/* ── Raffle sign-up ── (hidden - re-enable by removing `false &&`) */}
-      {false && !isPulseActive && !isLobby && (
-        <div style={{
-          margin: '1rem 0',
-          padding: '1rem',
-          background: raffleEntered
-            ? 'rgba(34,197,94,0.08)'
-            : 'rgba(249,115,22,0.08)',
-          border: `1px solid ${raffleEntered
-            ? 'rgba(34,197,94,0.25)'
-            : 'rgba(249,115,22,0.25)'}`,
-          borderRadius: 12,
-          textAlign: 'center',
-        }}>
-          {raffleEntered ? (
-            <p style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>
-              🎟️ You're entered in the raffle!
-            </p>
-          ) : (
-            <>
-              <p style={{ color: '#f97316', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                🎟️ Tonight's Raffle
-              </p>
-              <button
-                onClick={handleRaffleEnter}
-                disabled={raffleLoading}
-                style={{
-                  background: '#f97316', color: '#000',
-                  border: 'none', borderRadius: 8,
-                  padding: '0.625rem 1.5rem',
-                  fontWeight: 800, fontSize: '0.875rem',
-                  cursor: raffleLoading ? 'not-allowed' : 'pointer',
-                  opacity: raffleLoading ? 0.6 : 1,
-                }}
-              >
-                {raffleLoading ? 'Entering...' : 'Enter Raffle'}
-              </button>
-              {raffleError && (
-                <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: '0.5rem', margin: '0.5rem 0 0' }}>
-                  {raffleError}
-                </p>
-              )}
-            </>
-          )}
         </div>
       )}
 

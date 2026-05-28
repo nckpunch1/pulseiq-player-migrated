@@ -524,10 +524,10 @@ export async function handleJoinRequest(memberId, action) {
   }
 
   // Return updated members list
-  const membersSnap = await getDocs(
-    query(collection(firestore, 'teams', teamId, 'members'), where('status', '==', 'member')),
-  )
-  const teamSnap = await getDoc(doc(firestore, 'teams', teamId))
+  const [membersSnap, teamSnap] = await Promise.all([
+    getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('status', '==', 'member'))),
+    getDoc(doc(firestore, 'teams', teamId)),
+  ])
   const captainId = teamSnap.data()?.captainId
 
   const members = membersSnap.docs.map(d => {
@@ -638,11 +638,16 @@ export async function getGames() {
 export async function getGameDetails(sessionId) {
   const user = requireUser()
 
-  const sessionSnap = await getDoc(doc(firestore, 'sessions', sessionId))
+  // Session doc and user doc (for teamId) are independent — fetch in parallel
+  const [sessionSnap, teamId] = await Promise.all([
+    getDoc(doc(firestore, 'sessions', sessionId)),
+    resolveTeamId(user.uid),
+  ])
+
   if (!sessionSnap.exists()) throw new ApiError('NOT_FOUND', 'Game not found.')
   const sessionData = sessionSnap.data()
 
-  const teamId = await resolveTeamId(user.uid)
+  let venueName = ''
   let teamObj = null
   let membership = null
   let registration = null
@@ -651,10 +656,14 @@ export async function getGameDetails(sessionId) {
   let isCaptain = false
 
   if (teamId) {
-    const [teamSnap, myMemberSnap] = await Promise.all([
+    // Venue, team doc, member record, and registration doc are all independent — fetch in parallel
+    const [resolvedVenue, teamSnap, myMemberSnap, regDocSnap] = await Promise.all([
+      getVenueName(sessionData.venueId),
       getDoc(doc(firestore, 'teams', teamId)),
       getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('userId', '==', user.uid))),
+      getDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId)),
     ])
+    venueName = resolvedVenue || sessionData.venue || ''
 
     const teamData = teamSnap.data() ?? {}
     const myMemberData = myMemberSnap.docs[0]?.data() ?? {}
@@ -668,7 +677,6 @@ export async function getGameDetails(sessionId) {
 
     // Primary: direct doc lookup — teamId from user doc is the source of truth
     const regDocRef = doc(firestore, 'sessions', sessionId, 'registrations', teamId)
-    let regDocSnap = await getDoc(regDocRef)
     let foundRegDoc = null
 
     if (regDocSnap.exists()) {
@@ -709,9 +717,9 @@ export async function getGameDetails(sessionId) {
     } else {
       canRegister = sessionData.status === 'open' || sessionData.status === 'scheduled'
     }
+  } else {
+    venueName = await getVenueName(sessionData.venueId) || sessionData.venue || ''
   }
-
-  const venueName = await getVenueName(sessionData.venueId) || sessionData.venue || ''
 
   return {
     game: {
