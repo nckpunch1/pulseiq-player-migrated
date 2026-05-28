@@ -32,6 +32,7 @@ export default function Games() {
   useEffect(() => {
     setLoading(true)
     setError('')
+    let cancelled = false
     const sessUnsubs = new Map()
     const regUnsubs = new Map()
 
@@ -45,6 +46,7 @@ export default function Games() {
 
     api.getGames()
       .then(data => {
+        if (cancelled) return
         const initialGames = data.games ?? []
         setGames(initialGames)
         setLoading(false)
@@ -83,11 +85,13 @@ export default function Games() {
         }
       })
       .catch(err => {
+        if (cancelled) return
         setError(err.message ?? 'Failed to load games.')
         setLoading(false)
       })
 
     return () => {
+      cancelled = true
       for (const unsub of sessUnsubs.values()) unsub()
       for (const unsub of regUnsubs.values()) unsub()
     }
