@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot, getDoc, getDocs, setDoc, collection, query, serverTimestamp } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { api } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import './game-detail.css'
 
 function formatGameDate(d) {
@@ -52,6 +53,7 @@ function SizePicker({ value, onChange, disabled }) {
 
 export default function GameDetail() {
   const { id: canonicalSessionId } = useParams()
+  const { user, player } = useAuth()
 
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -61,6 +63,16 @@ export default function GameDetail() {
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
+  const [waitlistStatus, setWaitlistStatus] = useState(null)
+  const [waitlistPosition, setWaitlistPosition] = useState(null)
+  const [joiningWaitlist, setJoiningWaitlist] = useState(false)
+
+  const userData = {
+    teamId: detail?.team?.id ?? null,
+    uid: user?.uid ?? null,
+    displayName: player?.display_name ?? null,
+    firstName: player?.first_name ?? null,
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -162,6 +174,24 @@ export default function GameDetail() {
     }
   }, [canonicalSessionId, retryCount])
 
+  useEffect(() => {
+    if (!detail?.game?.soldOut || !userData.teamId) return
+    const checkWaitlist = async () => {
+      try {
+        const snap = await getDoc(doc(
+          firestore,
+          'sessions', canonicalSessionId,
+          'waitlist', userData.teamId
+        ))
+        if (snap.exists()) {
+          setWaitlistStatus(snap.data().status)
+          setWaitlistPosition(snap.data().position)
+        }
+      } catch (e) {}
+    }
+    checkWaitlist()
+  }, [canonicalSessionId, detail?.game?.soldOut, userData.teamId])
+
   async function handleRegister() {
     setActionBusy(true)
     setActionError('')
@@ -254,6 +284,42 @@ export default function GameDetail() {
   const isCheckedIn = attendanceStatus === 'checked_in'
   const showConfirmAttendance = canConfirmAttendance
 
+  const handleJoinWaitlist = async () => {
+    if (!userData?.teamId || !isCaptain) return
+    setJoiningWaitlist(true)
+    try {
+      const teamSnap = await getDoc(
+        doc(firestore, 'teams', userData.teamId)
+      )
+      const team = teamSnap.data()
+
+      const existingSnap = await getDocs(query(
+        collection(firestore, 'sessions', canonicalSessionId, 'waitlist'),
+      ))
+      const position = existingSnap.docs
+        .filter(d => d.data().status === 'waiting').length + 1
+
+      await setDoc(
+        doc(firestore, 'sessions', canonicalSessionId,
+          'waitlist', userData.teamId),
+        {
+          teamId: userData.teamId,
+          teamName: team.name,
+          captainId: userData.uid,
+          captainName: userData.displayName ?? userData.firstName ?? '',
+          position,
+          status: 'waiting',
+          requestedAt: serverTimestamp(),
+        }
+      )
+      setWaitlistStatus('waiting')
+      setWaitlistPosition(position)
+    } catch (e) {
+      console.error(e)
+    }
+    setJoiningWaitlist(false)
+  }
+
   return (
     <div className="gd-page">
 
@@ -298,122 +364,205 @@ export default function GameDetail() {
           {registrationStatus && <RegistrationStatusBadge registrationStatus={registrationStatus} />}
         </div>
 
-        {/* No team */}
-        {!hasTeam && (
-          <div className="gd-card gd-card--info">
-            <p className="gd-readonly-note">You need a team to register for games.</p>
-          </div>
-        )}
+        {game?.soldOut ? (
+          <div style={{
+            background: 'rgba(239,68,68,0.06)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: 12,
+            padding: '1.25rem',
+          }}>
+            <p style={{
+              color: '#ef4444', fontWeight: 800,
+              fontSize: '0.9rem', marginBottom: '0.5rem',
+            }}>
+              🔴 This game is sold out
+            </p>
 
-        {/* Registration open — captain */}
-        {hasTeam && canRegister && isCaptain && (
-          <div className="gd-card">
-            {actionError && <div className="gd-error-banner">{actionError}</div>}
-            <p className="gd-action-prompt">How many players will attend?</p>
-            <SizePicker value={teamSize} onChange={setTeamSize} disabled={actionBusy} />
-            <button
-              className="gd-btn gd-btn--primary"
-              onClick={handleRegister}
-              disabled={actionBusy}
-            >
-              {actionBusy ? 'Registering…' : 'Register Team'}
-            </button>
-          </div>
-        )}
-
-        {/* Registration open — non-captain */}
-        {hasTeam && canRegister && !isCaptain && (
-          <div className="gd-card gd-card--info">
-            <p className="gd-readonly-note">Only your team captain can register for games.</p>
-          </div>
-        )}
-
-        {/* Attendance confirmation — captain */}
-        {hasTeam && showConfirmAttendance && isCaptain && (
-          <div className="gd-card">
-            {actionError && <div className="gd-error-banner">{actionError}</div>}
-            {registration && (
-              <p className="gd-registered-team">
-                Registered as <strong>{registration.team_name}</strong>
+            {waitlistStatus === 'waiting' ? (
+              <>
+                <p style={{
+                  color: '#ccc', fontSize: '0.85rem',
+                  marginBottom: '0.25rem',
+                }}>
+                  You're on the waitlist
+                </p>
+                <p style={{
+                  color: '#f97316', fontWeight: 800,
+                  fontSize: '1.5rem',
+                }}>
+                  #{waitlistPosition}
+                </p>
+                <p style={{
+                  color: '#666', fontSize: '0.8rem',
+                  marginTop: '0.5rem',
+                }}>
+                  We'll be in touch if a spot opens up.
+                </p>
+              </>
+            ) : waitlistStatus === 'promoted' ? (
+              <p style={{ color: '#4ade80', fontWeight: 700 }}>
+                ✓ You've been moved to confirmed registrations
+              </p>
+            ) : isCaptain ? (
+              <>
+                <p style={{
+                  color: '#888', fontSize: '0.85rem',
+                  marginBottom: '1rem',
+                }}>
+                  Join the waitlist and we'll contact you
+                  if a spot becomes available.
+                </p>
+                <button
+                  onClick={handleJoinWaitlist}
+                  disabled={joiningWaitlist}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(249,115,22,0.15)',
+                    color: '#f97316',
+                    border: '1px solid rgba(249,115,22,0.3)',
+                    borderRadius: 10,
+                    padding: '0.75rem',
+                    fontWeight: 800,
+                    cursor: joiningWaitlist
+                      ? 'not-allowed' : 'pointer',
+                    opacity: joiningWaitlist ? 0.6 : 1,
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {joiningWaitlist
+                    ? 'Joining...'
+                    : 'Join Waitlist'
+                  }
+                </button>
+              </>
+            ) : (
+              <p style={{
+                color: '#888', fontSize: '0.85rem'
+              }}>
+                Only your team captain can join the waitlist.
               </p>
             )}
-            <p className="gd-action-prompt">Please confirm your team&apos;s attendance.</p>
-            <SizePicker value={teamSize} onChange={setTeamSize} disabled={actionBusy} />
-            <button
-              className="gd-btn gd-btn--primary"
-              onClick={handleConfirmAttendance}
-              disabled={actionBusy}
-            >
-              {actionBusy ? 'Confirming…' : 'Confirm Attendance'}
-            </button>
-            <button
-              className="gd-btn gd-btn--ghost"
-              onClick={handleCancelRegistration}
-              disabled={actionBusy}
-            >
-              {actionBusy ? 'Cancelling…' : 'Cancel Registration'}
-            </button>
           </div>
-        )}
-
-        {/* Attendance confirmation — non-captain */}
-        {hasTeam && showConfirmAttendance && !isCaptain && (
-          <div className="gd-card gd-card--info">
-            {registration && (
-              <p className="gd-registered-team">
-                Registered as <strong>{registration.team_name}</strong>
-              </p>
+        ) : (
+          <>
+            {/* No team */}
+            {!hasTeam && (
+              <div className="gd-card gd-card--info">
+                <p className="gd-readonly-note">You need a team to register for games.</p>
+              </div>
             )}
-            <p className="gd-readonly-note">Attendance confirmation pending — your captain will confirm.</p>
-          </div>
-        )}
 
-        {/* Registered, no current action */}
-        {hasTeam && isRegistered && !canRegister && !showConfirmAttendance && (
-          <div className="gd-card">
-            <div className="gd-status-row">
-              <span className="gd-status-check">✓</span>
-              <div className="gd-status-info">
-                <span className="gd-status-team">{registration.team_name}</span>
-                {attendanceConfirmed ? (
-                  <span className="gd-status-sub">
-                    Attendance confirmed · {registration.confirmed_team_size}{' '}
-                    {registration.confirmed_team_size === 1 ? 'player' : 'players'}
-                  </span>
-                ) : isCheckedIn ? (
-                  <span className="gd-status-sub">Checked in</span>
-                ) : (
-                  <span className="gd-status-sub">
-                    Registered · attendance confirmation pending
-                  </span>
+            {/* Registration open — captain */}
+            {hasTeam && canRegister && isCaptain && (
+              <div className="gd-card">
+                {actionError && <div className="gd-error-banner">{actionError}</div>}
+                <p className="gd-action-prompt">How many players will attend?</p>
+                <SizePicker value={teamSize} onChange={setTeamSize} disabled={actionBusy} />
+                <button
+                  className="gd-btn gd-btn--primary"
+                  onClick={handleRegister}
+                  disabled={actionBusy}
+                >
+                  {actionBusy ? 'Registering…' : 'Register Team'}
+                </button>
+              </div>
+            )}
+
+            {/* Registration open — non-captain */}
+            {hasTeam && canRegister && !isCaptain && (
+              <div className="gd-card gd-card--info">
+                <p className="gd-readonly-note">Only your team captain can register for games.</p>
+              </div>
+            )}
+
+            {/* Attendance confirmation — captain */}
+            {hasTeam && showConfirmAttendance && isCaptain && (
+              <div className="gd-card">
+                {actionError && <div className="gd-error-banner">{actionError}</div>}
+                {registration && (
+                  <p className="gd-registered-team">
+                    Registered as <strong>{registration.team_name}</strong>
+                  </p>
+                )}
+                <p className="gd-action-prompt">Please confirm your team&apos;s attendance.</p>
+                <SizePicker value={teamSize} onChange={setTeamSize} disabled={actionBusy} />
+                <button
+                  className="gd-btn gd-btn--primary"
+                  onClick={handleConfirmAttendance}
+                  disabled={actionBusy}
+                >
+                  {actionBusy ? 'Confirming…' : 'Confirm Attendance'}
+                </button>
+                <button
+                  className="gd-btn gd-btn--ghost"
+                  onClick={handleCancelRegistration}
+                  disabled={actionBusy}
+                >
+                  {actionBusy ? 'Cancelling…' : 'Cancel Registration'}
+                </button>
+              </div>
+            )}
+
+            {/* Attendance confirmation — non-captain */}
+            {hasTeam && showConfirmAttendance && !isCaptain && (
+              <div className="gd-card gd-card--info">
+                {registration && (
+                  <p className="gd-registered-team">
+                    Registered as <strong>{registration.team_name}</strong>
+                  </p>
+                )}
+                <p className="gd-readonly-note">Attendance confirmation pending — your captain will confirm.</p>
+              </div>
+            )}
+
+            {/* Registered, no current action */}
+            {hasTeam && isRegistered && !canRegister && !showConfirmAttendance && (
+              <div className="gd-card">
+                <div className="gd-status-row">
+                  <span className="gd-status-check">✓</span>
+                  <div className="gd-status-info">
+                    <span className="gd-status-team">{registration.team_name}</span>
+                    {attendanceConfirmed ? (
+                      <span className="gd-status-sub">
+                        Attendance confirmed · {registration.confirmed_team_size}{' '}
+                        {registration.confirmed_team_size === 1 ? 'player' : 'players'}
+                      </span>
+                    ) : isCheckedIn ? (
+                      <span className="gd-status-sub">Checked in</span>
+                    ) : (
+                      <span className="gd-status-sub">
+                        Registered · attendance confirmation pending
+                      </span>
+                    )}
+                  </div>
+                  {(attendanceConfirmed || isCheckedIn) && (
+                    <RegistrationStatusBadge registrationStatus={registrationStatus} />
+                  )}
+                </div>
+                {!isCaptain && !attendanceConfirmed && !isCheckedIn && (
+                  <p className="gd-readonly-note">Your captain will confirm attendance.</p>
                 )}
               </div>
-              {(attendanceConfirmed || isCheckedIn) && (
-                <RegistrationStatusBadge registrationStatus={registrationStatus} />
-              )}
-            </div>
-            {!isCaptain && !attendanceConfirmed && !isCheckedIn && (
-              <p className="gd-readonly-note">Your captain will confirm attendance.</p>
             )}
-          </div>
-        )}
 
-        {/* Has team, not registered, registration not open */}
-        {hasTeam && !isRegistered && !canRegister && (
-          <div className="gd-card gd-card--info">
-            <p className="gd-readonly-note">
-              Registration is not currently open for this game.
-            </p>
-          </div>
-        )}
+            {/* Has team, not registered, registration not open */}
+            {hasTeam && !isRegistered && !canRegister && (
+              <div className="gd-card gd-card--info">
+                <p className="gd-readonly-note">
+                  Registration is not currently open for this game.
+                </p>
+              </div>
+            )}
 
-        {/* Game is live — show waiting message for non-checked-in teams */}
-        {game.status === 'live' && isRegistered && !isCheckedIn && (
-          <div className="gd-card gd-card--live">
-            <p className="gd-live-text">
-              Game is live — your host will check you in shortly.
-            </p>
-          </div>
+            {/* Game is live — show waiting message for non-checked-in teams */}
+            {game.status === 'live' && isRegistered && !isCheckedIn && (
+              <div className="gd-card gd-card--live">
+                <p className="gd-live-text">
+                  Game is live — your host will check you in shortly.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
       </section>
