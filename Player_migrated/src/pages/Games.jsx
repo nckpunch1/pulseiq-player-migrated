@@ -147,6 +147,23 @@ export default function Games() {
                   <div className="games-card-top">
                     <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
                     <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
+                    {game.soldOut && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        color: '#ef4444',
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        padding: '2px 8px',
+                        borderRadius: 99,
+                        letterSpacing: '0.05em',
+                        marginLeft: '0.5rem',
+                      }}>
+                        SOLD OUT
+                      </span>
+                    )}
                   </div>
                   <p className="games-card-venue">{game.venue}</p>
                   <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
@@ -197,6 +214,23 @@ export default function Games() {
                 <div className="games-card-top">
                   <span className="games-card-title">{game.name || 'Upcoming Game'}</span>
                   <GameBadge gameStatus={game.status} registrationStatus={game.registration_status} />
+                  {game.soldOut && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      color: '#ef4444',
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
+                      padding: '2px 8px',
+                      borderRadius: 99,
+                      letterSpacing: '0.05em',
+                      marginLeft: '0.5rem',
+                    }}>
+                      SOLD OUT
+                    </span>
+                  )}
                 </div>
                 <p className="games-card-venue">{game.venue}</p>
                 <p className="games-card-date">{formatGameDate(game.date?.toDate?.())}</p>
