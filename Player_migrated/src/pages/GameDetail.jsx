@@ -134,7 +134,7 @@ export default function GameDetail() {
               const registrationStatus =
                 attendanceStatus === 'checked_in' ? 'checked_in' :
                 attendanceStatus === 'no_show' ? 'no_show' :
-                attendanceStatus === 'confirmed' ? 'confirmed' :
+                (attendanceStatus === 'confirmed' || attendanceStatus === 'attending' || attendanceStatus === 'present') ? 'confirmed' :
                 (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') ? 'confirmation_requested' :
                 'registered'
               setDetail(prev => ({
@@ -280,7 +280,13 @@ export default function GameDetail() {
   const registrationStatus = registration?.registration_status ?? null
   const hasTeam = !!team
   const isRegistered = !!registration
-  const attendanceConfirmed = attendanceStatus === 'confirmed'
+  const attendanceConfirmed =
+    registration?.attendance_status === 'confirmed' ||
+    registration?.attendance_status === 'attending' ||
+    registration?.attendance_status === 'present' ||
+    registration?.attendanceStatus === 'confirmed' ||
+    registration?.attendanceStatus === 'attending' ||
+    registration?.attendanceStatus === 'present'
   const isCheckedIn = attendanceStatus === 'checked_in'
   const showConfirmAttendance = canConfirmAttendance
 

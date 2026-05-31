@@ -93,7 +93,7 @@ function tsToIso(val) {
 function mapAttendanceStatus(attendanceStatus) {
   if (attendanceStatus === 'checked_in') return 'checked_in'
   if (attendanceStatus === 'no_show') return 'no_show'
-  if (attendanceStatus === 'confirmed') return 'confirmed'
+  if (attendanceStatus === 'confirmed' || attendanceStatus === 'attending' || attendanceStatus === 'present') return 'confirmed'
   if (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') return 'confirmation_requested'
   return 'registered'
 }
