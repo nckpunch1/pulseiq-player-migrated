@@ -66,11 +66,11 @@ export default function Team() {
           new Map(latestMembersDocs.map(m => [m.id, m])).values()
         )
         const isCaptain = latestTeamDoc.captainId === firebaseUser.uid
-        const myMember = uniqueMembers.find(m => m.userId === firebaseUser.uid && m.status === 'member')
+        const myMember = uniqueMembers.find(m => m.userId === firebaseUser.uid && (!m.status || m.status === 'member'))
         const myRole = myMember?.role ?? 'member'
 
         const members = uniqueMembers
-          .filter(m => m.status === 'member')
+          .filter(m => !m.status || m.status === 'member')
           .map(m => ({
             player_id: m.userId,
             player_name: m.displayName,
