@@ -14,6 +14,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   limit,
@@ -407,33 +408,37 @@ export async function getTeam() {
 export async function createTeam(teamName) {
   const user = requireUser()
   const userData = await getUserDoc(user.uid)
+  const displayName = userData.displayName ?? ''
 
   const teamRef = doc(collection(firestore, 'teams'))
-  const teamId = teamRef.id
-  const memberRef = doc(collection(firestore, 'teams', teamId, 'members'))
+  const memberRef = doc(firestore, 'teams', teamRef.id, 'members', user.uid)
 
-  await Promise.all([
-    setDoc(teamRef, {
-      name: teamName,
-      nameLower: teamName.toLowerCase(),
-      captainId: user.uid,
-      captainName: userData.displayName ?? '',
-      createdAt: serverTimestamp(),
-      memberCount: 1,
-    }),
-    setDoc(memberRef, {
-      userId: user.uid,
-      status: 'member',
-      role: 'captain',
-      displayName: userData.displayName ?? '',
-      username: userData.username ?? '',
-      joinedAt: serverTimestamp(),
-    }),
-    updateDoc(doc(firestore, 'users', user.uid), { teamId }),
-  ])
+  const batch = writeBatch(firestore)
 
-  const team = { id: teamId, name: teamName }
-  const membership = { player_id: user.uid, team_id: teamId, is_captain: true, is_scribe: true }
+  batch.set(teamRef, {
+    name: teamName,
+    nameLower: teamName.toLowerCase(),
+    captainId: user.uid,
+    captainName: displayName,
+    memberCount: 1,
+    createdAt: serverTimestamp(),
+  })
+
+  batch.set(memberRef, {
+    userId: user.uid,
+    displayName,
+    username: userData.username ?? '',
+    role: 'captain',
+    status: 'member',
+    joinedAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+
+  await updateDoc(doc(firestore, 'users', user.uid), { teamId: teamRef.id })
+
+  const team = { id: teamRef.id, name: teamName }
+  const membership = { player_id: user.uid, team_id: teamRef.id, is_captain: true, is_scribe: true }
   return { team, membership }
 }
 
@@ -819,7 +824,26 @@ export function getPaperLiveState(sessionId, onData) {
 
 // ─── Leaderboards ─────────────────────────────────────────────────────────────
 
-export async function getLeaderboards() {
+const compareTeams = (a, b) => {
+  if (b.total_points !== a.total_points) {
+    return b.total_points - a.total_points
+  }
+  const aRounds = a.roundScores ?? {}
+  const bRounds = b.roundScores ?? {}
+  const maxRound = Math.max(
+    ...Object.keys(aRounds).map(Number).filter(n => !isNaN(n)),
+    ...Object.keys(bRounds).map(Number).filter(n => !isNaN(n)),
+    0
+  )
+  for (let r = maxRound; r >= 1; r--) {
+    const aScore = aRounds[r] ?? 0
+    const bScore = bRounds[r] ?? 0
+    if (bScore !== aScore) return bScore - aScore
+  }
+  return 0
+}
+
+export async function getLeaderboards(regionId) {
   // Both reads are independent — fire them in parallel.
   // Each has its own .catch() so one failure doesn't suppress the other.
   // NOTE: collectionGroup('leaderboard') requires the 'leaderboard' collection group
@@ -849,6 +873,9 @@ export async function getLeaderboards() {
     for (const d of allTimeSnap.docs) {
       const data = d.data()
       if (data.archived) continue
+
+      const entryRegion = data.regionId ?? 'global'
+      if (regionId && entryRegion !== regionId) continue
       // Try data field first, fall back to extracting
       // from doc ID (old format: just teamId,
       // new format: teamId_regionId)
@@ -872,7 +899,7 @@ export async function getLeaderboards() {
       teamTotals[teamId].games_played += data.gamesPlayed ?? data.games_played ?? 0
     }
     all_time_leaderboard = Object.values(teamTotals)
-      .sort((a, b) => b.total_points - a.total_points)
+      .sort(compareTeams)
       .map((entry, idx) => ({ ...entry, rank: idx + 1 }))
   }
 
@@ -901,8 +928,9 @@ export async function getSeasonLeaderboard(seasonId, regionId) {
         total_points: data.totalPoints ?? 0,
         games_played: data.gamesPlayed ?? 0,
         rank: data.rank ?? 0,
+        roundScores: data.roundScores ?? {},
       }
     })
     .filter(entry => !entry.archived)
-    .sort((a, b) => a.rank - b.rank)
+    .sort(compareTeams)
 }

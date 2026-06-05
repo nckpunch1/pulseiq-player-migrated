@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { doc, collection, query, onSnapshot, addDoc, getDocs, getDoc, updateDoc, where, serverTimestamp, collectionGroup } from 'firebase/firestore'
+import { doc, collection, query, onSnapshot, addDoc, getDocs, getDoc, setDoc, updateDoc, where, serverTimestamp, collectionGroup } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
@@ -41,6 +41,11 @@ export default function Team() {
 
   // ── Leave
   const [leaveBusy, setLeaveBusy] = useState(false)
+
+  // ── Invite
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteResult, setInviteResult] = useState(null)
 
   useEffect(() => {
     let unsubTeam = null
@@ -362,6 +367,80 @@ export default function Team() {
     } finally {
       setHandlingId(null)
     }
+  }
+
+  const handleInvitePlayer = async () => {
+    const email = inviteEmail.trim().toLowerCase()
+    if (!email) return
+    setInviting(true)
+    setInviteResult(null)
+
+    try {
+      const userSnap = await getDocs(query(
+        collection(firestore, 'users'),
+        where('email', '==', email)
+      ))
+
+      if (!userSnap.empty) {
+        const existingUser = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() }
+
+        const memberSnap = await getDocs(query(
+          collection(firestore, 'teams', team.id, 'members'),
+          where('userId', '==', existingUser.id)
+        ))
+
+        if (!memberSnap.empty) {
+          setInviteResult({ type: 'info', message: `${existingUser.displayName ?? email} is already in your team` })
+          setInviting(false)
+          return
+        }
+
+        if (existingUser.teamId && existingUser.teamId !== team.id) {
+          setInviteResult({ type: 'error', message: `${existingUser.displayName ?? email} is already on another team` })
+          setInviting(false)
+          return
+        }
+
+        await setDoc(
+          doc(firestore, 'teams', team.id, 'members', existingUser.id),
+          {
+            userId: existingUser.id,
+            displayName: existingUser.displayName ?? existingUser.firstName ?? email.split('@')[0],
+            role: 'member',
+            status: 'member',
+            joinedAt: serverTimestamp(),
+          }
+        )
+
+        setInviteResult({ type: 'success', message: `${existingUser.displayName ?? email} added to your team` })
+        setInviteEmail('')
+
+      } else {
+        const res = await fetch(
+          'https://admin.pulseiq.com.au/api/send-invite',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toEmail: email,
+              captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
+              teamName: team?.name ?? 'the team',
+            }),
+          }
+        )
+
+        if (res.ok) {
+          setInviteResult({ type: 'sent', message: `Invite sent to ${email} — they'll need to register first` })
+          setInviteEmail('')
+        } else {
+          setInviteResult({ type: 'error', message: 'Failed to send invite. Try again.' })
+        }
+      }
+    } catch (e) {
+      console.error('Invite error:', e)
+      setInviteResult({ type: 'error', message: 'Something went wrong. Try again.' })
+    }
+    setInviting(false)
   }
 
   async function handleLeave() {
@@ -812,6 +891,84 @@ export default function Team() {
         </section>
       )}
 
+      {/* ── Invite player (captain only) ── */}
+      {isCaptain && (
+        <div style={{
+          marginTop: '1.5rem',
+          padding: '1rem',
+          background: 'rgba(249,115,22,0.06)',
+          border: '1px solid rgba(249,115,22,0.2)',
+          borderRadius: 12,
+        }}>
+          <p style={{
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#f97316',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            marginBottom: '0.75rem',
+          }}>
+            Invite a Player
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="email"
+              placeholder="player@email.com"
+              value={inviteEmail}
+              onChange={e => {
+                setInviteEmail(e.target.value)
+                setInviteResult(null)
+              }}
+              style={{
+                flex: 1,
+                background: '#111',
+                border: '1px solid #333',
+                borderRadius: 8,
+                padding: '0.7rem 0.75rem',
+                color: '#fff',
+                fontSize: '1rem',
+                minHeight: '44px',
+              }}
+            />
+            <button
+              onClick={handleInvitePlayer}
+              disabled={inviting || !inviteEmail.trim()}
+              style={{
+                background: '#f97316',
+                color: '#000',
+                border: 'none',
+                borderRadius: 8,
+                padding: '0.7rem 1rem',
+                fontWeight: 800,
+                cursor: inviting ? 'not-allowed' : 'pointer',
+                opacity: (inviting || !inviteEmail.trim()) ? 0.5 : 1,
+                whiteSpace: 'nowrap',
+                fontSize: '0.9rem',
+                minHeight: '44px',
+              }}
+            >
+              {inviting ? 'Checking...' : 'Invite'}
+            </button>
+          </div>
+          {inviteResult && (
+            <p style={{
+              marginTop: '0.5rem',
+              fontSize: '0.82rem',
+              color: inviteResult.type === 'success'
+                ? '#4ade80'
+                : inviteResult.type === 'sent'
+                ? '#60a5fa'
+                : inviteResult.type === 'info'
+                ? '#fbbf24'
+                : '#f87171',
+            }}>
+              {inviteResult.type === 'success' && '✓ '}
+              {inviteResult.type === 'sent' && '📨 '}
+              {inviteResult.message}
+            </p>
+          )}
+        </div>
+      )}
 
     </div>
   )
