@@ -82,7 +82,7 @@ export default function Leaderboard() {
     setError('')
 
     async function load() {
-      const lbData = await api.getLeaderboards()
+      const lbData = await api.getLeaderboards(selectedRegionId)
 
       let seasonEntries = []
       if (lbData.current_season) {
