@@ -416,15 +416,27 @@ export default function Team() {
         setInviteEmail('')
 
       } else {
+        if (!auth.currentUser) {
+          setInviteResult({ type: 'error', message: 'Please sign in to send invites' })
+          setInviting(false)
+          return
+        }
+
+        const idToken = await auth.currentUser.getIdToken()
+
         const res = await fetch(
           'https://admin.pulseiq.com.au/api/send-invite',
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
             body: JSON.stringify({
               toEmail: email,
               captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
               teamName: team?.name ?? 'the team',
+              teamId: team.id,
             }),
           }
         )
@@ -432,6 +444,8 @@ export default function Team() {
         if (res.ok) {
           setInviteResult({ type: 'sent', message: `Invite sent to ${email} — they'll need to register first` })
           setInviteEmail('')
+        } else if (res.status === 401 || res.status === 403) {
+          setInviteResult({ type: 'error', message: "Couldn't send invite — please refresh and try again" })
         } else {
           setInviteResult({ type: 'error', message: 'Failed to send invite. Try again.' })
         }
