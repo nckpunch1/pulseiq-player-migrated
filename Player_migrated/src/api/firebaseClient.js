@@ -634,6 +634,7 @@ export async function getGames() {
       team_name: regData?.teamName ?? null,
       regionId: data.regionId ?? null,
       regionName: data.regionName ?? null,
+      soldOut: data.soldOut === true,
     }
   })
 
@@ -720,7 +721,9 @@ export async function getGameDetails(sessionId) {
         (reg.attendanceStatus === 'confirmation_requested' || reg.attendanceStatus === 'attendance_requested') &&
         sessionData.status !== 'completed'
     } else {
-      canRegister = sessionData.status === 'open' || sessionData.status === 'scheduled'
+      canRegister =
+        sessionData.soldOut !== true &&
+        (sessionData.status === 'open' || sessionData.status === 'scheduled')
     }
   } else {
     venueName = await getVenueName(sessionData.venueId) || sessionData.venue || ''
@@ -736,6 +739,7 @@ export async function getGameDetails(sessionId) {
       game_id: sessionId,
       status: sessionData.status,
       game_state: sessionData.status === 'live' ? 'live' : null,
+      soldOut: sessionData.soldOut === true,
     },
     team: teamObj,
     membership,
@@ -751,6 +755,15 @@ export async function registerForGame(sessionId, teamSize) {
   const userSnap = await getDoc(doc(firestore, 'users', user.uid))
   const teamId = userSnap.exists() ? (userSnap.data().teamId ?? null) : null
   if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
+
+  // Re-read the session and reject the write if it's sold out. The UI already
+  // hides Register on sold-out sessions; this guards against a stale client.
+  // NOTE: this is a soft guard only — authoritative enforcement belongs in
+  // firestore.rules (follow-up).
+  const sessionSnap = await getDoc(doc(firestore, 'sessions', sessionId))
+  if (sessionSnap.data()?.soldOut === true) {
+    throw new ApiError('SOLD_OUT', 'Session is sold out.')
+  }
 
   const teamSnap = await getDoc(doc(firestore, 'teams', teamId))
   const teamName = teamSnap.data()?.name ?? ''
