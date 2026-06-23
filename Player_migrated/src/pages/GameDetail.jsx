@@ -106,10 +106,11 @@ export default function GameDetail() {
           (snap) => {
             if (!snap.exists()) return
             const s = snap.data()
+            const soldOut = s.soldOut === true
             setDetail(prev => ({
               ...prev,
-              game: { ...prev.game, status: s.status, game_state: s.status === 'live' ? 'live' : null },
-              can_register: !prev.registration && (s.status === 'open' || s.status === 'scheduled'),
+              game: { ...prev.game, status: s.status, game_state: s.status === 'live' ? 'live' : null, soldOut },
+              can_register: !prev.registration && !soldOut && (s.status === 'open' || s.status === 'scheduled'),
             }))
           }
         )

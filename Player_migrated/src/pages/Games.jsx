@@ -61,9 +61,11 @@ export default function Games() {
             doc(firestore, 'sessions', sessionId),
             (snap) => {
               if (!snap.exists()) return
-              const status = snap.data().status
+              const data = snap.data()
+              const status = data.status
+              const soldOut = data.soldOut === true
               setGames(prev => prev.map(g =>
-                g.canonical_session_id === sessionId ? { ...g, status } : g
+                g.canonical_session_id === sessionId ? { ...g, status, soldOut } : g
               ))
             }
           ))
