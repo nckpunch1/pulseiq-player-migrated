@@ -151,7 +151,13 @@ export default function Leaderboard() {
   )
 
   const { current_season, current_season_leaderboard, all_time_leaderboard } = data
-  const entries = tab === 'season' ? (current_season_leaderboard ?? []) : (all_time_leaderboard ?? [])
+  const rawEntries = tab === 'season' ? (current_season_leaderboard ?? []) : (all_time_leaderboard ?? [])
+  // Hide test teams named "Test 1", "Test 2", etc. so test runs don't show up on
+  // live leaderboards. Matches only the exact "Test <number>" pattern so real team
+  // names are never affected. Re-rank sequentially so there are no gaps.
+  const entries = rawEntries
+    .filter(e => !/^test\s*\d+$/i.test((e.team_name ?? '').trim()))
+    .map((e, i) => ({ ...e, rank: i + 1 }))
 
   return (
     <div className="lb-page">
