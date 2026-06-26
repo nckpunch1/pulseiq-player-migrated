@@ -293,6 +293,11 @@ export default function GameDetail() {
 
   const handleJoinWaitlist = async () => {
     if (!userData?.teamId || !isCaptain) return
+    if (isRegistered) {
+      setActionError('Your team is already registered for this session.')
+      return
+    }
+    setActionError('')
     setJoiningWaitlist(true)
     try {
       const teamSnap = await getDoc(
@@ -371,7 +376,7 @@ export default function GameDetail() {
           {registrationStatus && <RegistrationStatusBadge registrationStatus={registrationStatus} />}
         </div>
 
-        {game?.soldOut ? (
+        {game?.soldOut && !isRegistered ? (
           <div style={{
             background: 'rgba(239,68,68,0.06)',
             border: '1px solid rgba(239,68,68,0.2)',
