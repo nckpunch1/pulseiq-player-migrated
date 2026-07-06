@@ -1,1 +1,27 @@
-/.DS_Store
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
+*.log
+
+# Firebase local
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# Vercel
+.vercel
