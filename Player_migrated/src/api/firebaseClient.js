@@ -856,6 +856,25 @@ const compareTeams = (a, b) => {
   return 0
 }
 
+// An entry is excluded from leaderboards if the team doc is missing
+// (hard-deleted orphan) or the team is soft-deleted (isActive === false).
+// Structural only — no name-based heuristics.
+const isExcludedTeam = (teamSnap) => {
+  if (!teamSnap || !teamSnap.exists()) return true
+  return teamSnap.data()?.isActive === false
+}
+
+// Batch-fetch /teams docs by id, deduped. Single-doc getDoc per id (the deployed
+// rules permit an authed get on any team; a collection list is not used here).
+// Returns Map<teamId, DocumentSnapshot>.
+const fetchTeamSnapsByIds = async (teamIds) => {
+  const unique = [...new Set(teamIds.filter(Boolean))]
+  const snaps = await Promise.all(
+    unique.map(id => getDoc(doc(firestore, 'teams', id)))
+  )
+  return new Map(unique.map((id, i) => [id, snaps[i]]))
+}
+
 export async function getLeaderboards(regionId) {
   // Both reads are independent — fire them in parallel.
   // Each has its own .catch() so one failure doesn't suppress the other.
@@ -882,7 +901,10 @@ export async function getLeaderboards(regionId) {
 
   let all_time_leaderboard = []
   if (allTimeSnap) {
-    const teamTotals = {}
+    // Collect non-archived, region-matched rows with the bare teamId extracted,
+    // then join to /teams and drop orphaned/inactive teams before aggregating —
+    // otherwise a hard-deleted team's cached points still count.
+    const rows = []
     for (const d of allTimeSnap.docs) {
       const data = d.data()
       if (data.archived) continue
@@ -900,6 +922,15 @@ export async function getLeaderboards(regionId) {
             : docId)
 
       if (!teamId) continue
+      rows.push({ teamId, data })
+    }
+
+    // Dedupe happens inside fetchTeamSnapsByIds — a teamId can recur across seasons/regions.
+    const teamSnaps = await fetchTeamSnapsByIds(rows.map(r => r.teamId))
+
+    const teamTotals = {}
+    for (const { teamId, data } of rows) {
+      if (isExcludedTeam(teamSnaps.get(teamId))) continue
       if (!teamTotals[teamId]) {
         teamTotals[teamId] = {
           team_id: teamId,
@@ -932,18 +963,35 @@ export async function getSeasonLeaderboard(seasonId, regionId) {
   const col = collection(firestore, 'seasons', seasonId, 'leaderboard')
   const q = regionId ? query(col, where('regionId', '==', regionId)) : query(col)
   const snap = await getDocs(q)
-  return snap.docs
-    .map(d => {
-      const data = d.data()
-      return {
-        team_id: d.id,
-        team_name: data.teamName,
-        total_points: data.totalPoints ?? 0,
-        games_played: data.gamesPlayed ?? 0,
-        rank: data.rank ?? 0,
-        roundScores: data.roundScores ?? {},
-      }
-    })
-    .filter(entry => !entry.archived)
+
+  // Drop archived entries on the RAW doc data — the previous `.filter(e => !e.archived)`
+  // tested a field absent from the mapped object, so it never filtered anything.
+  // Also extract the bare teamId: the doc id is the composite `${teamId}_${regionId}`,
+  // not the bare id, so we need the field-or-split logic before joining to /teams.
+  const rows = []
+  for (const d of snap.docs) {
+    const data = d.data()
+    if (data.archived) continue
+    const docId = d.id
+    const teamId = data.teamId
+      ?? data.team_id
+      ?? (docId.includes('_') ? docId.split('_')[0] : docId)
+    if (!teamId) continue
+    rows.push({ teamId, data })
+  }
+
+  // Join to /teams and drop orphaned (missing doc) or inactive teams.
+  const teamSnaps = await fetchTeamSnapsByIds(rows.map(r => r.teamId))
+
+  return rows
+    .filter(({ teamId }) => !isExcludedTeam(teamSnaps.get(teamId)))
+    .map(({ teamId, data }) => ({
+      team_id: teamId,
+      team_name: data.teamName,
+      total_points: data.totalPoints ?? 0,
+      games_played: data.gamesPlayed ?? 0,
+      rank: data.rank ?? 0,
+      roundScores: data.roundScores ?? {},
+    }))
     .sort(compareTeams)
 }
