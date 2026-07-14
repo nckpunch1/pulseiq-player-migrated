@@ -313,15 +313,40 @@ export async function dashboard() {
     try {
       if (seasonSnap && !seasonSnap.empty) {
         const seasonId = seasonSnap.docs[0].id
-        const lbSnap = await getDoc(doc(firestore, 'seasons', seasonId, 'leaderboard', teamId))
-        if (lbSnap.exists()) {
+        // Leaderboard docs are keyed by the composite `${teamId}_${regionId}`
+        // (one entry per region the team has played in), never the bare
+        // teamId — so look up by the teamId field, mirroring
+        // getSeasonLeaderboard. Archived entries and null ranks (written by
+        // the orphan/inactive exclusion) don't represent a standing.
+        const lbSnap = await getDocs(query(
+          collection(firestore, 'seasons', seasonId, 'leaderboard'),
+          where('teamId', '==', teamId)
+        ))
+        const entries = lbSnap.docs
+          .map(d => d.data())
+          .filter(e => e.archived !== true && e.rank != null)
+        if (entries.length > 0) {
+          // Ranks are per-region sequences; a multi-region team keeps its
+          // best (lowest) standing for the tile.
+          const best = entries.reduce((a, b) => (b.rank < a.rank ? b : a))
           leaderboard_summary = {
-            team_current_season_rank: lbSnap.data().rank ?? null,
+            team_current_season_rank: best.rank,
+            // "Global" is the placeholder for region-less play — not worth
+            // labelling on the tile.
+            team_current_season_region:
+              best.regionName && best.regionName !== 'Global' ? best.regionName : null,
+            // Not fetched: an all-time rank means aggregating every
+            // leaderboard doc across every season (see getLeaderboards) —
+            // too read-heavy for a dashboard tile. Follow-up feature.
             team_all_time_rank: null,
           }
         }
       }
-    } catch { /* non-critical */ }
+    } catch (e) {
+      // Non-critical — a failed rank read shouldn't break the dashboard —
+      // but not invisible either.
+      console.warn('Dashboard season rank read failed:', e)
+    }
   } else {
     // No team — list only public sessions without registration status
     sessSnap.docs

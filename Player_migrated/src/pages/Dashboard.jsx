@@ -79,6 +79,7 @@ export default function Dashboard() {
   const isCaptain = membership?.is_captain ?? false
   const pendingCount = isCaptain ? (pending_join_requests?.length ?? 0) : 0
   const seasonRank = leaderboard_summary?.team_current_season_rank
+  const seasonRankRegion = leaderboard_summary?.team_current_season_region
   const allTimeRank = leaderboard_summary?.team_all_time_rank
   const hasRanks = seasonRank != null || allTimeRank != null
 
@@ -158,7 +159,9 @@ export default function Dashboard() {
           <div className="dash-rank-strip">
             {seasonRank != null && (
               <div className="dash-rank-item">
-                <span className="dash-rank-label">Season Rank</span>
+                <span className="dash-rank-label">
+                  Season Rank{seasonRankRegion ? ` · ${seasonRankRegion}` : ''}
+                </span>
                 <span className="dash-rank-value">#{seasonRank}</span>
               </div>
             )}
