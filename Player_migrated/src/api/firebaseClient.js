@@ -824,6 +824,8 @@ export async function confirmAttendance(sessionId, confirmedTeamSize) {
   await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
     attendanceStatus: 'confirmed',
     confirmedTeamSize,
+    confirmedBy: 'captain',
+    confirmedAt: serverTimestamp(),
   })
 
   return {
