@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore'
 import { ref, onValue } from 'firebase/database'
 import { auth, firestore, db } from '../lib/firebase'
+import { cached, cacheKey, TTL_MS } from './cache'
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,15 @@ export async function resetPassword(email) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
+// Keyed on uid, not just the function name: two accounts on the same device must
+// never see each other's dashboard. requireUser() runs here as well as in the
+// body so an unauthenticated call still throws instead of reaching the cache.
 export async function dashboard() {
+  const user = requireUser()
+  return cached(cacheKey('dashboard', user.uid), TTL_MS, dashboardUncached)
+}
+
+async function dashboardUncached() {
   const user = requireUser()
 
   // Sessions query doesn't need teamId — run it in parallel with the user doc read
@@ -592,7 +601,13 @@ export async function leaveTeam(teamId) {
 
 // ─── Games ────────────────────────────────────────────────────────────────────
 
+// Keyed on uid — registration status is per-team, so this result is per-user.
 export async function getGames() {
+  const user = requireUser()
+  return cached(cacheKey('getGames', user.uid), TTL_MS, getGamesUncached)
+}
+
+async function getGamesUncached() {
   const user = requireUser()
 
   // Sessions query doesn't need teamId — run it in parallel with the user doc read
@@ -902,7 +917,19 @@ const fetchTeamSnapsByIds = async (teamIds) => {
   return new Map(unique.map((id, i) => [id, snaps[i]]))
 }
 
+// The biggest single beneficiary of the cache: this path is ~165 reads per mount
+// (see the unbounded collectionGroup scan below). Leaderboard data is global, so
+// the key is the region only — no uid. The read-cost redesign is a separate pass;
+// this only stops paying it on every navigation.
 export async function getLeaderboards(regionId) {
+  return cached(
+    cacheKey('getLeaderboards', regionId ?? null),
+    TTL_MS,
+    () => getLeaderboardsUncached(regionId),
+  )
+}
+
+async function getLeaderboardsUncached(regionId) {
   // Both reads are independent — fire them in parallel.
   // Each has its own .catch() so one failure doesn't suppress the other.
   // NOTE: collectionGroup('leaderboard') requires the 'leaderboard' collection group
@@ -981,12 +1008,26 @@ export async function getLeaderboards(regionId) {
   }
 }
 
+// Global and near-static, but refetched on every Leaderboard mount.
 export async function listRegions() {
+  return cached(cacheKey('listRegions'), TTL_MS, listRegionsUncached)
+}
+
+async function listRegionsUncached() {
   const snap = await getDocs(collection(firestore, 'regions'))
   return snap.docs.map(d => ({ id: d.id, name: d.data().name }))
 }
 
+// Global data, keyed on both args so seasons and regions can't collide.
 export async function getSeasonLeaderboard(seasonId, regionId) {
+  return cached(
+    cacheKey('getSeasonLeaderboard', seasonId ?? null, regionId ?? null),
+    TTL_MS,
+    () => getSeasonLeaderboardUncached(seasonId, regionId),
+  )
+}
+
+async function getSeasonLeaderboardUncached(seasonId, regionId) {
   const col = collection(firestore, 'seasons', seasonId, 'leaderboard')
   const q = regionId ? query(col, where('regionId', '==', regionId)) : query(col)
   const snap = await getDocs(q)
