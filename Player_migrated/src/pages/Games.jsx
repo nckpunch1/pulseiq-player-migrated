@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { collection, collectionGroup, doc, documentId, onSnapshot, query, where } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import './games.css'
@@ -33,8 +33,7 @@ export default function Games() {
     setLoading(true)
     setError('')
     let cancelled = false
-    const sessUnsubs = new Map()
-    const regUnsubs = new Map()
+    const unsubs = []
 
     function mapStatus(attendanceStatus) {
       if (attendanceStatus === 'checked_in') return 'checked_in'
@@ -42,6 +41,15 @@ export default function Games() {
       if (attendanceStatus === 'confirmed' || attendanceStatus === 'attending' || attendanceStatus === 'present') return 'confirmed'
       if (attendanceStatus === 'confirmation_requested' || attendanceStatus === 'attendance_requested') return 'confirmation_requested'
       return 'registered'
+    }
+
+    // Applies a registration doc (or its absence) to the matching game row.
+    function applyRegistrations(bySessionId) {
+      setGames(prev => prev.map(g => {
+        const reg = bySessionId.get(g.canonical_session_id)
+        if (!reg) return { ...g, registration_status: 'not_registered', team_name: null }
+        return { ...g, registration_status: mapStatus(reg.attendanceStatus), team_name: reg.teamName ?? g.team_name }
+      }))
     }
 
     api.getGames()
@@ -52,38 +60,64 @@ export default function Games() {
         setLoading(false)
 
         const teamId = initialGames.find(g => g.team_id)?.team_id ?? null
+        const sessionIds = initialGames.map(g => g.canonical_session_id).filter(Boolean)
 
-        for (const game of initialGames) {
-          const sessionId = game.canonical_session_id
-
-          // Session status listener (e.g. game goes live or completes)
-          sessUnsubs.set(sessionId, onSnapshot(
-            doc(firestore, 'sessions', sessionId),
+        // Session status (goes live, completes, sells out) via one listener per
+        // batch of 30 ids — Firestore's `in` limit — rather than one per session.
+        // Filtering on documentId rather than status keeps the doc set fixed, so a
+        // session that completes still reports its new status instead of dropping
+        // out of the query and vanishing from the list.
+        for (let i = 0; i < sessionIds.length; i += 30) {
+          const idBatch = sessionIds.slice(i, i + 30)
+          unsubs.push(onSnapshot(
+            query(collection(firestore, 'sessions'), where(documentId(), 'in', idBatch)),
             (snap) => {
-              if (!snap.exists()) return
-              const data = snap.data()
-              const status = data.status
-              const soldOut = data.soldOut === true
-              setGames(prev => prev.map(g =>
-                g.canonical_session_id === sessionId ? { ...g, status, soldOut } : g
-              ))
+              const byId = new Map(snap.docs.map(d => [d.id, d.data()]))
+              setGames(prev => prev.map(g => {
+                const data = byId.get(g.canonical_session_id)
+                if (!data) return g
+                return { ...g, status: data.status, soldOut: data.soldOut === true }
+              }))
             }
           ))
+        }
 
-          // Registration status listener (confirmation_requested, checked_in, etc.)
-          if (teamId) {
-            regUnsubs.set(sessionId, onSnapshot(
-              doc(firestore, 'sessions', sessionId, 'registrations', teamId),
-              (snap) => {
-                setGames(prev => prev.map(g => {
-                  if (g.canonical_session_id !== sessionId) return g
-                  if (!snap.exists()) return { ...g, registration_status: 'not_registered', team_name: null }
-                  const reg = snap.data()
-                  return { ...g, registration_status: mapStatus(reg.attendanceStatus), team_name: reg.teamName ?? g.team_name }
-                }))
+        // Registration status (confirmation_requested, checked_in, etc.) for every
+        // session at once. One collection-group subscription replaces the previous
+        // one-listener-per-session fan-out; liveness is unchanged, so a team that
+        // just registered still self-corrects without a refetch.
+        if (teamId) {
+          unsubs.push(onSnapshot(
+            query(collectionGroup(firestore, 'registrations'), where('teamId', '==', teamId)),
+            (snap) => {
+              const bySessionId = new Map()
+              for (const d of snap.docs) {
+                const sessionId = d.ref.parent.parent?.id
+                if (sessionId) bySessionId.set(sessionId, d.data())
               }
-            ))
-          }
+              applyRegistrations(bySessionId)
+            },
+            (err) => {
+              // The collection-group query needs a `registrations.teamId` index. If
+              // it is missing (or rules reject the group read) fall back to the old
+              // per-session listeners so registration status stays live.
+              console.error('[Games] registration collection-group listener failed, falling back per session:', err)
+              if (cancelled) return
+              for (const sessionId of sessionIds) {
+                unsubs.push(onSnapshot(
+                  doc(firestore, 'sessions', sessionId, 'registrations', teamId),
+                  (regSnap) => {
+                    setGames(prev => prev.map(g => {
+                      if (g.canonical_session_id !== sessionId) return g
+                      if (!regSnap.exists()) return { ...g, registration_status: 'not_registered', team_name: null }
+                      const reg = regSnap.data()
+                      return { ...g, registration_status: mapStatus(reg.attendanceStatus), team_name: reg.teamName ?? g.team_name }
+                    }))
+                  }
+                ))
+              }
+            }
+          ))
         }
       })
       .catch(err => {
@@ -94,8 +128,8 @@ export default function Games() {
 
     return () => {
       cancelled = true
-      for (const unsub of sessUnsubs.values()) unsub()
-      for (const unsub of regUnsubs.values()) unsub()
+      for (const unsub of unsubs) unsub()
+      unsubs.length = 0
     }
   }, [retryCount])
 
