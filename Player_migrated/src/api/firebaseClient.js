@@ -233,6 +233,28 @@ export function invalidateTeamAndGameState() {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
+// Every registration this team holds, keyed by the session it belongs to.
+//
+// One collection-group query replaces the per-session N+1 that dashboard() and
+// getGames() both ran (one getDocs per open session). The parent session id is
+// recovered from the doc ref, since registration docs carry teamId but not
+// sessionId. Callers only look up the sessions they are rendering, so rows for
+// past sessions come back and are simply never read — the trade is a read count
+// linear in the team's history rather than in the number of open sessions.
+async function getTeamRegistrationsBySession(teamId) {
+  if (!teamId) return new Map()
+  const snap = await getDocs(query(
+    collectionGroup(firestore, 'registrations'),
+    where('teamId', '==', teamId),
+  ))
+  const bySession = new Map()
+  for (const d of snap.docs) {
+    const sessionId = d.ref.parent.parent?.id
+    if (sessionId) bySession.set(sessionId, d.data())
+  }
+  return bySession
+}
+
 // Keyed on uid, not just the function name: two accounts on the same device must
 // never see each other's dashboard. requireUser() runs here as well as in the
 // body so an unauthenticated call still throws instead of reaching the cache.
@@ -259,9 +281,12 @@ async function dashboardUncached() {
   const upcoming_games = []
 
   if (teamId) {
-    const [teamSnap, myMemberSnap] = await Promise.all([
+    // Registrations join this batch rather than running after it — teamId is
+    // already known here, so it costs no extra round trip.
+    const [teamSnap, myMemberSnap, regBySession] = await Promise.all([
       getDoc(doc(firestore, 'teams', teamId)),
       getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('userId', '==', user.uid))),
+      getTeamRegistrationsBySession(teamId),
     ])
 
     const teamData = teamSnap.data() ?? {}
@@ -277,33 +302,20 @@ async function dashboardUncached() {
     }
 
     const sessionDocs = sessSnap.docs
-    const registrationSnaps = teamId
-      ? await Promise.all(
-          sessionDocs.map(sessDoc =>
-            getDocs(query(
-              collection(firestore, 'sessions', sessDoc.id, 'registrations'),
-              where('teamId', '==', teamId),
-            ))
-          )
-        )
-      : sessionDocs.map(() => ({ empty: true, docs: [] }))
 
+    // A private session is only visible to a team that is registered for it.
+    // The map lookup also replaces the old O(N²) scan (a .some() over every
+    // registration inside a .filter() over every session, plus a findIndex).
     const visibleSessions = sessionDocs.filter(sessDoc => {
       const sessData = sessDoc.data()
       if (!sessData.visibility || sessData.visibility === 'public') return true
-      if (sessData.visibility === 'private') {
-        return registrationSnaps.some((regSnap, i) => {
-          return sessionDocs[i].id === sessDoc.id && !regSnap.empty
-        })
-      }
+      if (sessData.visibility === 'private') return regBySession.has(sessDoc.id)
       return true
     })
 
     for (const sessDoc of visibleSessions) {
-      const origIdx = sessionDocs.findIndex(d => d.id === sessDoc.id)
       const sessData = sessDoc.data()
-      const regSnap = registrationSnaps[origIdx]
-      const regData = regSnap.empty ? null : regSnap.docs[0]?.data()
+      const regData = regBySession.get(sessDoc.id) ?? null
       upcoming_games.push({
         id: sessDoc.id,
         canonical_session_id: sessDoc.id,
@@ -658,17 +670,10 @@ async function getGamesUncached() {
   // Deduplicate venue IDs so a shared venue is only read once across all sessions
   const uniqueVenueIds = [...new Set(sessionDocs.map(d => d.data().venueId).filter(Boolean))]
 
-  // All registrations + all unique venue reads in one parallel batch
-  const [registrationSnaps, venueSnaps] = await Promise.all([
-    teamId
-      ? Promise.all(sessionDocs.map(d =>
-          getDocs(query(
-            collection(firestore, 'sessions', d.id, 'registrations'),
-            where('teamId', '==', teamId),
-            limit(1),
-          ))
-        ))
-      : Promise.resolve(sessionDocs.map(() => ({ empty: true, docs: [] }))),
+  // All registrations (one collection-group query) + all unique venue reads in
+  // one parallel batch
+  const [regBySession, venueSnaps] = await Promise.all([
+    getTeamRegistrationsBySession(teamId),
     Promise.all(uniqueVenueIds.map(id =>
       getDoc(doc(firestore, 'venues', id)).catch(() => null)
     )),
@@ -682,18 +687,16 @@ async function getGamesUncached() {
   )
 
   // Filter out private sessions the team isn't registered for
-  const visiblePairs = sessionDocs
-    .map((d, i) => [d, registrationSnaps[i]])
-    .filter(([d, regSnap]) => {
-      const vis = d.data().visibility
-      if (!vis || vis === 'public') return true
-      if (vis === 'private') return !regSnap.empty
-      return true
-    })
+  const visibleSessions = sessionDocs.filter(d => {
+    const vis = d.data().visibility
+    if (!vis || vis === 'public') return true
+    if (vis === 'private') return regBySession.has(d.id)
+    return true
+  })
 
-  const games = visiblePairs.map(([d, regSnap]) => {
+  const games = visibleSessions.map(d => {
     const data = d.data()
-    const regData = !regSnap.empty ? regSnap.docs[0]?.data() : null
+    const regData = regBySession.get(d.id) ?? null
     const venueName = (data.venueId ? (venueMap.get(data.venueId) ?? '') : '') || data.venue || ''
 
     return {
