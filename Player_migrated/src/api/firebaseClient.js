@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore'
 import { ref, onValue } from 'firebase/database'
 import { auth, firestore, db } from '../lib/firebase'
-import { cached, cacheKey, TTL_MS, invalidate, clear as clearCache } from './cache'
+import { cached, cacheKey, getStale, TTL_MS, invalidate, clear as clearCache } from './cache'
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 
@@ -229,6 +229,36 @@ export async function resetPassword(email) {
 export function invalidateTeamAndGameState() {
   invalidate('dashboard')
   invalidate('getGames')
+}
+
+// ─── Cached-value peeks (stale-while-revalidate) ──────────────────────────────
+//
+// A screen calls these on mount to render its last-known content instead of
+// blanking to "Loading…", then revalidates by calling the real function. Key
+// construction stays here, next to the `cached()` calls it has to match, rather
+// than leaking cache keys into the pages.
+//
+// Each returns undefined when nothing is cached — first visit of the session, or
+// straight after an invalidation — which is exactly when a screen *should* show
+// its loading state. They read `auth.currentUser` directly rather than
+// `requireUser()`: a peek runs during render and must never throw.
+
+export function peekDashboard() {
+  const uid = auth.currentUser?.uid
+  return uid ? getStale(cacheKey('dashboard', uid)) : undefined
+}
+
+export function peekGames() {
+  const uid = auth.currentUser?.uid
+  return uid ? getStale(cacheKey('getGames', uid)) : undefined
+}
+
+export function peekLeaderboards(regionId) {
+  return getStale(cacheKey('getLeaderboards', regionId ?? null))
+}
+
+export function peekSeasonLeaderboard(seasonId, regionId) {
+  return getStale(cacheKey('getSeasonLeaderboard', seasonId ?? null, regionId ?? null))
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────

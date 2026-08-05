@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './leaderboard.css'
@@ -53,11 +53,31 @@ function LeaderboardTable({ entries, myTeamId }) {
   )
 }
 
+// The view this screen renders is composed from two separately-cached reads, so
+// the seed has to be composed too. Returns undefined unless every piece is
+// present — a half-seeded view would render as an empty table, which is a worse
+// lie than the loading state.
+function peekLeaderboardView(regionId) {
+  const lb = api.peekLeaderboards(regionId)
+  if (!lb) return undefined
+  const season = lb.current_season
+  const seasonEntries = season ? api.peekSeasonLeaderboard(season.id, regionId) : []
+  if (seasonEntries === undefined) return undefined
+  return {
+    current_season: season,
+    current_season_leaderboard: seasonEntries,
+    all_time_leaderboard: lb.all_time_leaderboard ?? [],
+  }
+}
+
 export default function Leaderboard() {
   const [teamId, setTeamId] = useState(undefined) // undefined = loading
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Last-known view for the default region, rendered immediately so navigating
+  // back to this tab doesn't blank. undefined => nothing cached => real load.
+  const seed = useMemo(() => peekLeaderboardView(null), [])
+  const [data, setData] = useState(seed ?? null)
   const [error, setError] = useState('')
+  const hasContent = useRef(seed !== undefined)
   const [tab, setTab] = useState('season') // season | alltime
   const [retryCount, setRetryCount] = useState(0)
   const [regions, setRegions] = useState([])
@@ -77,9 +97,7 @@ export default function Leaderboard() {
   }, [teamId])
 
   useEffect(() => {
-    setData(null)
-    setLoading(true)
-    setError('')
+    let cancelled = false
 
     async function load() {
       const lbData = await api.getLeaderboards(selectedRegionId)
@@ -89,19 +107,42 @@ export default function Leaderboard() {
         seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, selectedRegionId)
       }
 
+      if (cancelled) return
       setData({
         current_season: lbData.current_season,
         current_season_leaderboard: seasonEntries,
         all_time_leaderboard: lbData.all_time_leaderboard ?? [],
       })
+      hasContent.current = true
     }
 
+    // Seed from *this* region's cache. On a region switch with nothing cached we
+    // deliberately clear and show the loading state: holding the previous
+    // region's table under a new region's heading would be showing wrong
+    // numbers, which is worse than a brief load. Navigation back to a region
+    // already seen stays instant.
+    const regionSeed = peekLeaderboardView(selectedRegionId)
+    hasContent.current = regionSeed !== undefined
+    setData(regionSeed ?? null)
+    setError('')
+
     load()
-      .catch(err => setError(err.message ?? 'Failed to load leaderboard.'))
-      .finally(() => setLoading(false))
+      .catch(err => {
+        if (cancelled) return
+        // A failed refresh must never wipe a table already on screen.
+        if (!hasContent.current) setError(err.message ?? 'Failed to load leaderboard.')
+      })
+
+    return () => { cancelled = true }
   }, [retryCount, selectedRegionId])
 
-  if (loading || teamId === undefined) {
+  // Spinner only when there is genuinely nothing to show. `data` is the whole
+  // signal now — a separate `loading` flag would say nothing this doesn't, since
+  // the revalidate runs invisibly underneath whatever is already rendered.
+  // `teamId` no longer gates it either: it drives just the "You" row highlight
+  // and the no-team empty state, so waiting on it would blank a screen we can
+  // already draw. Phrased on `data` so the destructure below is always safe.
+  if (!data && !error) {
     return (
       <div className="lb-page">
         <div className="lb-state-fill">

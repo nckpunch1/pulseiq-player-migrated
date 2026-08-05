@@ -15,6 +15,10 @@ import {
   resendVerificationEmail,
   resetPassword,
   dashboard,
+  peekDashboard,
+  peekGames,
+  peekLeaderboards,
+  peekSeasonLeaderboard,
   getTeamId,
   getTeam,
   createTeam,
@@ -46,6 +50,13 @@ export const api = {
 
   // Dashboard
   dashboard,
+
+  // Cached-value peeks — let a screen render its last-known content on mount
+  // instead of blanking to a loading state. See firebaseClient for semantics.
+  peekDashboard,
+  peekGames,
+  peekLeaderboards: (regionId) => peekLeaderboards(regionId),
+  peekSeasonLeaderboard: (seasonId, regionId) => peekSeasonLeaderboard(seasonId, regionId),
 
   // Cache — for the one mutation that writes Firestore directly rather than
   // going through this client (Team.jsx's "Been approved? Tap to refresh").

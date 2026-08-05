@@ -65,6 +65,22 @@ export function get(key) {
   return peek(key)?.value
 }
 
+/**
+ * Cached value for `key` regardless of freshness, without evicting it.
+ *
+ * This is the stale-while-revalidate read: a screen calls it on mount to render
+ * its last-known content immediately, then revalidates through `cached()`. It is
+ * deliberately unlike its two neighbours — `get` is fresh-only, and `peek` drops
+ * an expired entry as a side effect, which would defeat the point here.
+ *
+ * It reads the same store as everything else, so `invalidate()` and `clear()`
+ * take the seed with them: after a mutation, or after sign-out, the next mount
+ * finds nothing and correctly falls back to a real load.
+ */
+export function getStale(key) {
+  return store.get(key)?.value
+}
+
 export function set(key, value, ttlMs = TTL_MS) {
   store.set(key, { value, expiresAt: Date.now() + ttlMs })
 }

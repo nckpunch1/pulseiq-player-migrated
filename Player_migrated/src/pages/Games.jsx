@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, collectionGroup, doc, documentId, onSnapshot, query, where } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
@@ -24,14 +24,18 @@ function GameBadge({ gameStatus, registrationStatus }) {
 }
 
 export default function Games() {
-  const [games, setGames] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Last-known games list, if this session has loaded one before. Rendering it
+  // straight away is what stops navigation blanking to "Loading…"; the effect
+  // below revalidates underneath it and the listeners attach as usual once the
+  // refetch resolves. undefined => nothing cached => real load.
+  const seed = useMemo(() => api.peekGames(), [])
+  const [games, setGames] = useState(seed?.games ?? [])
+  const [loading, setLoading] = useState(seed === undefined)
   const [error, setError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
+  const hasContent = useRef(seed !== undefined)
 
   useEffect(() => {
-    setLoading(true)
-    setError('')
     let cancelled = false
     const unsubs = []
 
@@ -52,11 +56,15 @@ export default function Games() {
       }))
     }
 
+    if (!hasContent.current) setLoading(true)
+    setError('')
+
     api.getGames()
       .then(data => {
         if (cancelled) return
         const initialGames = data.games ?? []
         setGames(initialGames)
+        hasContent.current = true
         setLoading(false)
 
         const teamId = initialGames.find(g => g.team_id)?.team_id ?? null
@@ -122,7 +130,9 @@ export default function Games() {
       })
       .catch(err => {
         if (cancelled) return
-        setError(err.message ?? 'Failed to load games.')
+        // A failed refresh must never wipe a list already on screen — keep
+        // showing the stale games rather than dropping to the error state.
+        if (!hasContent.current) setError(err.message ?? 'Failed to load games.')
         setLoading(false)
       })
 

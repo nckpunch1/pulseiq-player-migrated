@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import './dashboard.css'
@@ -22,15 +22,23 @@ function RegistrationBadge({ status, gameStatus }) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Last-known dashboard, if this session has loaded one before. Rendering it
+  // straight away is what stops navigation blanking to "Loading…"; the effect
+  // below revalidates underneath it. undefined => nothing cached => real load.
+  const seed = useMemo(() => api.peekDashboard(), [])
+  const [data, setData] = useState(seed ?? null)
+  const [loading, setLoading] = useState(seed === undefined)
   const [error, setError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
+  // Mirrors "is there something on screen right now", readable from the async
+  // revalidate without adding `data` to the effect's deps.
+  const hasContent = useRef(seed !== undefined)
 
   useEffect(() => {
-    setLoading(true)
-    setError('')
+    let cancelled = false
     ;(async () => {
+      if (!hasContent.current) setLoading(true)
+      setError('')
       try {
         let data
         try {
@@ -43,16 +51,25 @@ export default function Dashboard() {
             throw err
           }
         }
+        if (cancelled) return
         setData(data)
+        hasContent.current = true
       } catch (err) {
-        setError(err.message ?? 'Failed to load dashboard.')
+        if (cancelled) return
+        // A failed refresh must never wipe content already on screen — keep
+        // showing the stale dashboard rather than dropping to the error state.
+        if (!hasContent.current) setError(err.message ?? 'Failed to load dashboard.')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     })()
+    return () => { cancelled = true }
   }, [retryCount])
 
-  if (loading) {
+  // Spinner only when there is genuinely nothing to show — with a seed, `data`
+  // is already set on the first render. Phrased on `data` as well as `loading`
+  // so the destructure below is always safe.
+  if (loading || (!data && !error)) {
     return (
       <div className="dash-page">
         <div className="dash-state-fill">
