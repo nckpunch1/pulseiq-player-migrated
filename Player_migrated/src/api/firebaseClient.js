@@ -611,6 +611,11 @@ export async function handleJoinRequest(memberId, action) {
     }
   })
 
+  // Covers approve and reject alike — both change the team's member list. This
+  // clears the captain's own cache; the approved player's device clears its own
+  // when they refresh, since a mutation here cannot reach another client.
+  invalidateTeamAndGameState()
+
   return { request: { id: memberId, status: action }, members }
 }
 
