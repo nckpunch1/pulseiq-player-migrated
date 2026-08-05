@@ -770,6 +770,12 @@ export default function Team() {
                 doc(firestore, 'users', auth.currentUser.uid),
                 { teamId: foundTeamId }
               )
+              // This writes users/{uid}.teamId without going through the api
+              // client, so nothing else clears the cached team-less Dashboard
+              // and Games payloads — which is what made this button feel dead
+              // for up to 30s at the exact moment someone is waiting to be let
+              // into a team.
+              api.invalidateTeamAndGameState()
             } catch (e) {
               console.error(e)
             }

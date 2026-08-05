@@ -32,6 +32,7 @@ import {
   getLeaderboards,
   listRegions,
   getSeasonLeaderboard,
+  invalidateTeamAndGameState,
 } from './firebaseClient'
 
 export const api = {
@@ -45,6 +46,10 @@ export const api = {
 
   // Dashboard
   dashboard,
+
+  // Cache — for the one mutation that writes Firestore directly rather than
+  // going through this client (Team.jsx's "Been approved? Tap to refresh").
+  invalidateTeamAndGameState,
 
   // Team
   getTeamId,

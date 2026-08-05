@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore'
 import { ref, onValue } from 'firebase/database'
 import { auth, firestore, db } from '../lib/firebase'
-import { cached, cacheKey, TTL_MS } from './cache'
+import { cached, cacheKey, TTL_MS, invalidate, clear as clearCache } from './cache'
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 
@@ -191,6 +191,8 @@ export async function me() {
 
 export async function logout() {
   await signOut(auth)
+  // Hygiene on a shared device: drop this account's cached reads from memory.
+  clearCache()
 }
 
 export async function resendVerificationEmail() {
@@ -206,6 +208,27 @@ export async function resetPassword(email) {
   } catch (err) {
     throw mapAuthError(err)
   }
+}
+
+// ─── Cache invalidation ───────────────────────────────────────────────────────
+
+/**
+ * Drop the cached reads that depend on the caller's team and registration state.
+ *
+ * Call after any mutation that changes either. Both `dashboard` and `getGames`
+ * are keyed on uid, so clearing by bare function name covers the current user
+ * (and harmlessly any other uid still in the map).
+ *
+ * Deliberately does NOT touch getLeaderboards / getSeasonLeaderboard /
+ * listRegions: those are slow-moving global data that none of these mutations
+ * affect, and they are the reads the cache exists to save (~165 per mount).
+ *
+ * Exported because one mutation lives outside this module — Team.jsx writes
+ * users/{uid}.teamId directly from its "Been approved? Tap to refresh" button.
+ */
+export function invalidateTeamAndGameState() {
+  invalidate('dashboard')
+  invalidate('getGames')
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -471,6 +494,11 @@ export async function createTeam(teamName) {
 
   await updateDoc(doc(firestore, 'users', user.uid), { teamId: teamRef.id })
 
+  // The sharp edge this invalidation exists for: without it the cached
+  // team-less payload survives, and Games.jsx skips attaching its registration
+  // listeners (it only attaches when teamId is set), so nothing self-corrects.
+  invalidateTeamAndGameState()
+
   const team = { id: teamRef.id, name: teamName }
   const membership = { player_id: user.uid, team_id: teamRef.id, is_captain: true, is_scribe: true }
   return { team, membership }
@@ -516,6 +544,8 @@ export async function requestToJoin(teamId) {
     username: userData.username ?? '',
     requestedAt: serverTimestamp(),
   })
+
+  invalidateTeamAndGameState()
 
   return { request: { id: memberRef.id, team_id: teamId, status: 'pending' } }
 }
@@ -595,6 +625,8 @@ export async function leaveTeam(teamId) {
     ...membersSnap.docs.map(d => deleteDoc(d.ref)),
     updateDoc(doc(firestore, 'users', user.uid), { teamId: null }),
   ])
+
+  invalidateTeamAndGameState()
 
   return { team: null, membership: null, members: [] }
 }
@@ -816,6 +848,8 @@ export async function registerForGame(sessionId, teamSize) {
     registeredAt: serverTimestamp(),
   })
 
+  invalidateTeamAndGameState()
+
   return {
     registration: {
       id: teamId,
@@ -843,6 +877,8 @@ export async function confirmAttendance(sessionId, confirmedTeamSize) {
     confirmedAt: serverTimestamp(),
   })
 
+  invalidateTeamAndGameState()
+
   return {
     registration: {
       attendance_status: 'confirmed',
@@ -860,6 +896,8 @@ export async function cancelRegistration(sessionId) {
   await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
     attendanceStatus: 'cancelled',
   })
+
+  invalidateTeamAndGameState()
 
   return { success: true }
 }
