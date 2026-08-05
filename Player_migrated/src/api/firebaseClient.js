@@ -80,9 +80,15 @@ async function resolveTeamId(uid) {
   return userData.teamId ?? null
 }
 
+// Cached so screens can seed `teamId` synchronously on mount — an uncached read
+// here left the Leaderboard unable to tell "no team" from "not known yet" for
+// the first moment after mount. Keyed on uid like every other per-user read.
+//
+// Only this public entry point is cached. `resolveTeamId` stays uncached because
+// the mutation paths that call it directly must see the live value.
 export async function getTeamId() {
   const user = requireUser()
-  return resolveTeamId(user.uid)
+  return cached(cacheKey('getTeamId', user.uid), TTL_MS, () => resolveTeamId(user.uid))
 }
 
 function tsToIso(val) {
@@ -229,6 +235,10 @@ export async function resetPassword(email) {
 export function invalidateTeamAndGameState() {
   invalidate('dashboard')
   invalidate('getGames')
+  // teamId changes on exactly the events this already fires on — create, join
+  // approval, leave — so it belongs in the same set rather than waiting out the
+  // TTL while screens seed from a stale value.
+  invalidate('getTeamId')
 }
 
 // ─── Cached-value peeks (stale-while-revalidate) ──────────────────────────────
@@ -251,6 +261,14 @@ export function peekDashboard() {
 export function peekGames() {
   const uid = auth.currentUser?.uid
   return uid ? getStale(cacheKey('getGames', uid)) : undefined
+}
+
+// Tri-state on purpose, and the reason this read is cached at all: `undefined`
+// means not known yet, `null` means known to have no team. A screen that cannot
+// tell those apart has to guess, and guessing wrong flashes the wrong panel.
+export function peekTeamId() {
+  const uid = auth.currentUser?.uid
+  return uid ? getStale(cacheKey('getTeamId', uid)) : undefined
 }
 
 export function peekLeaderboards(regionId) {

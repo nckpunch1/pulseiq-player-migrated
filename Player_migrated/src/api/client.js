@@ -17,6 +17,7 @@ import {
   dashboard,
   peekDashboard,
   peekGames,
+  peekTeamId,
   peekLeaderboards,
   peekSeasonLeaderboard,
   getTeamId,
@@ -55,6 +56,7 @@ export const api = {
   // instead of blanking to a loading state. See firebaseClient for semantics.
   peekDashboard,
   peekGames,
+  peekTeamId,
   peekLeaderboards: (regionId) => peekLeaderboards(regionId),
   peekSeasonLeaderboard: (seasonId, regionId) => peekSeasonLeaderboard(seasonId, regionId),
 

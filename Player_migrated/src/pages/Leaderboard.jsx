@@ -71,7 +71,10 @@ function peekLeaderboardView(regionId) {
 }
 
 export default function Leaderboard() {
-  const [teamId, setTeamId] = useState(undefined) // undefined = loading
+  // undefined = not known yet, null = known to have no team. Seeded from cache
+  // so a returning teamless user gets the "Join a team" panel on the first
+  // render instead of a leaderboard that is about to be replaced.
+  const [teamId, setTeamId] = useState(() => api.peekTeamId())
   // Last-known view for the default region, rendered immediately so navigating
   // back to this tab doesn't blank. undefined => nothing cached => real load.
   const seed = useMemo(() => peekLeaderboardView(null), [])
@@ -136,13 +139,14 @@ export default function Leaderboard() {
     return () => { cancelled = true }
   }, [retryCount, selectedRegionId])
 
-  // Spinner only when there is genuinely nothing to show. `data` is the whole
-  // signal now — a separate `loading` flag would say nothing this doesn't, since
-  // the revalidate runs invisibly underneath whatever is already rendered.
-  // `teamId` no longer gates it either: it drives just the "You" row highlight
-  // and the no-team empty state, so waiting on it would blank a screen we can
-  // already draw. Phrased on `data` so the destructure below is always safe.
-  if (!data && !error) {
+  // Spinner only when there is genuinely nothing correct to show. `data` covers
+  // the table itself — a separate `loading` flag would say nothing this doesn't,
+  // since the revalidate runs invisibly underneath whatever is already rendered.
+  // `teamId` is back in the gate now that it seeds from cache: without it a
+  // teamless user gets a table that the very next render replaces with the
+  // "Join a team" panel. Both seed after the first visit, so this only holds on
+  // a genuine first load. Phrased on `data` so the destructure below is safe.
+  if ((!data || teamId === undefined) && !error) {
     return (
       <div className="lb-page">
         <div className="lb-state-fill">
