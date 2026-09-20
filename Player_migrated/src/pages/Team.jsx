@@ -1,3 +1,4 @@
+import { regionSet } from '../lib/regionAccess'
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { doc, collection, query, onSnapshot, addDoc, getDocs, getDoc, setDoc, updateDoc, where, serverTimestamp, collectionGroup } from 'firebase/firestore'
@@ -19,6 +20,15 @@ export default function Team() {
   // ── No-team panel state
   const initialTab = searchParams.get('tab') === 'search' ? 'search' : 'create'
   const [noTeamTab, setNoTeamTab] = useState(initialTab)  // create | search
+  const [regionChoices, setRegionChoices] = useState([])
+  const [selectedRegionId, setSelectedRegionId] = useState('')
+  const [regionError, setRegionError] = useState('')
+  useEffect(() => {
+    let active = true
+    api.listRegions().then(rows => { if (active) setRegionChoices(rows) })
+      .catch(() => { if (active) setRegionError('Could not load regions. Please reload to try again.') })
+    return () => { active = false }
+  }, [])
   const [createName, setCreateName] = useState('')
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -30,6 +40,8 @@ export default function Team() {
   const [joinBusyId, setJoinBusyId] = useState(null)
 
   const [userData, setUserData] = useState(null)
+  const profileRegions = regionSet(userData)
+  const creationRegionId = selectedRegionId || (profileRegions.length === 1 ? profileRegions[0] : '')
 
   const [teamRequestStatus, setTeamRequestStatus] = useState(null) // null | 'pending' | 'submitting'
   const [requestNote, setRequestNote] = useState('')
@@ -307,7 +319,7 @@ export default function Team() {
     setCreateBusy(true)
     setCreateError('')
     try {
-      const data = await api.createTeam(name)
+      const data = await api.createTeam(name, creationRegionId)
       setSessionFromResponse(data)
       // listener will detect the new teamId on the user doc and update state
     } catch (err) {
@@ -541,6 +553,15 @@ export default function Team() {
               {createError && <div className="team-error-banner">{createError}</div>}
               <form onSubmit={handleCreate} className="team-form">
                 <div className="team-field">
+                  <label className="team-label" htmlFor="team-region-input">Region</label>
+                  <select id="team-region-input" className="team-input" required value={creationRegionId}
+                    onChange={e => setSelectedRegionId(e.target.value)} disabled={createBusy}>
+                    <option value="" disabled>Select a region</option>
+                    {regionChoices.map(region => <option key={region.id} value={region.id}>{region.name}</option>)}
+                  </select>
+                  {regionError && <p role="alert">{regionError}</p>}
+                </div>
+                <div className="team-field">
                   <label className="team-label" htmlFor="team-name-input">Team Name</label>
                   <input
                     id="team-name-input"
@@ -557,7 +578,7 @@ export default function Team() {
                 <button
                   className="team-btn team-btn--primary"
                   type="submit"
-                  disabled={createBusy || !createName.trim()}
+                  disabled={createBusy || !createName.trim() || !creationRegionId}
                 >
                   {createBusy ? 'Creating…' : 'Create Team'}
                 </button>

@@ -1,3 +1,4 @@
+import { teamCreationRegion, requireRegionId } from '../lib/regionAccess'
 import {
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -164,6 +165,7 @@ export async function register({ first_name, last_name, email, password }) {
       lastName: last_name,
       username: normalizedEmail,
       role: 'player',
+      regions: [],
       teamId: null,
       emailVerified: false,
       manuallyVerified: false,
@@ -522,10 +524,13 @@ export async function getTeam() {
   }
 }
 
-export async function createTeam(teamName) {
+export async function createTeam(teamName, selectedRegionId) {
   const user = requireUser()
   const userData = await getUserDoc(user.uid)
   const displayName = userData.displayName ?? ''
+  const regionId = teamCreationRegion(userData, selectedRegionId)
+  const region = await getDoc(doc(firestore, 'regions', regionId))
+  if (!region.exists()) throw new ApiError('REGION_NOT_FOUND', 'Select an existing region.')
 
   const teamRef = doc(collection(firestore, 'teams'))
   const memberRef = doc(firestore, 'teams', teamRef.id, 'members', user.uid)
@@ -533,6 +538,7 @@ export async function createTeam(teamName) {
   const batch = writeBatch(firestore)
 
   batch.set(teamRef, {
+    regionId,
     name: teamName,
     nameLower: teamName.toLowerCase(),
     captainId: user.uid,
@@ -896,7 +902,12 @@ export async function registerForGame(sessionId, teamSize) {
   const teamSnap = await getDoc(doc(firestore, 'teams', teamId))
   const teamName = teamSnap.data()?.name ?? ''
 
+  const existingRegistration = await getDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId))
+  const regionTag = existingRegistration.exists()
+    ? (existingRegistration.data().regionId === undefined ? {} : { regionId: existingRegistration.data().regionId })
+    : { regionId: requireRegionId(sessionSnap.data()?.regionId) }
   await setDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
+    ...regionTag,
     teamId,
     teamName,
     teamSize,

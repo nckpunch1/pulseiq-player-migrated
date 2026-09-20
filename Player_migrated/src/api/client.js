@@ -67,7 +67,7 @@ export const api = {
   // Team
   getTeamId,
   getTeam,
-  createTeam: (teamName) => createTeam(teamName),
+  createTeam: (teamName, regionId) => createTeam(teamName, regionId),
   searchTeams: (query) => searchTeams(query),
   requestToJoin: (teamId) => requestToJoin(teamId),
   getJoinRequests: (teamId) => getJoinRequests(teamId),
