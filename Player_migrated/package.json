@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:regions:rollout": "REGION_ROLLOUT_STRICT=1 vitest run tests/regionTagging.test.js"
   },
   "dependencies": {
     "firebase": "^12.12.1",

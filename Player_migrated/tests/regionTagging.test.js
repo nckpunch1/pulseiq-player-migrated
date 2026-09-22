@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { beforeEach, expect, it, vi } from 'vitest'
 const { docs, auth } = vi.hoisted(() => ({ docs: new Map(), auth: { currentUser: { uid: 'player' } } }))
 vi.mock('../src/lib/firebase', () => ({ firestore: {}, db: {}, auth }))
@@ -10,23 +11,33 @@ vi.mock('firebase/firestore', () => {
   const path = (base, ...parts) => typeof base === 'string' ? [base, ...parts].join('/') : parts.join('/')
   const key = ref => ref.path ?? ref
   return {
-    collection: path, collectionGroup: path, query: p => p, where: vi.fn(), limit: vi.fn(),
+    collection: path, collectionGroup: path,
+    query: (p, ...filters) => ({ path: p, filters }), where: (field, op, value) => ({ field, op, value }), limit: vi.fn(),
     doc: (base, ...parts) => parts.length ? path(base, ...parts) : { id: 'new-team', path: `${base}/new-team` },
     getDoc: vi.fn(async ref => ({ exists: () => docs.has(key(ref)), data: () => docs.get(key(ref)) })),
-    getDocs: vi.fn(), serverTimestamp: () => 'TIME',
+    getDocs: vi.fn(async ref => {
+      const prefix = `${key(ref)}/`
+      const entries = [...docs].filter(([p, data]) => p.startsWith(prefix) && !p.slice(prefix.length).includes('/')
+        && (ref.filters ?? []).every(({ field, op, value }) => op === 'in' ? value.includes(data[field]) : data[field] === value))
+      return { docs: entries.map(([p, data]) => ({ id: p.split('/').at(-1), ref: p, data: () => data })) }
+    }), serverTimestamp: () => 'TIME',
     setDoc: vi.fn(async (ref, data) => docs.set(key(ref), data)),
     updateDoc: vi.fn(async (ref, data) => docs.set(key(ref), { ...docs.get(key(ref)), ...data })),
-    deleteDoc: vi.fn(),
+    deleteDoc: vi.fn(async ref => docs.delete(key(ref))),
     writeBatch: () => {
       const writes = []
       return { set: (ref, data) => writes.push([key(ref), data]), commit: async () => writes.forEach(([ref, data]) => docs.set(ref, data)) }
     },
   }
 })
-import { createTeam, registerForGame, register } from '../src/api/firebaseClient'
-import { clear } from '../src/api/cache'
+import { createTeam, registerForGame, register, getGames, confirmAttendance, cancelRegistration, getTeamId, peekTeamId, peekGames, peekDashboard, logout, resetPassword, resendVerificationEmail, requestToJoin, getJoinRequests, handleJoinRequest, leaveTeam } from '../src/api/firebaseClient'
+import { getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { signOut, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth'
+import { clear, cacheKey, set as seedCache, getStale } from '../src/api/cache'
 import { hasRegionAccess, regionSet, teamCreationRegion } from '../src/lib/regionAccess'
 beforeEach(() => {
+  vi.clearAllMocks()
+  auth.currentUser = { uid: 'player' }
   docs.clear(); clear()
   docs.set('users/player', { displayName: 'Player', regions: ['north'] })
   docs.set('regions/north', { name: 'North' })
@@ -79,4 +90,164 @@ it('uses set semantics for single and multi-region profiles without scalar coerc
   expect(hasRegionAccess({ regions: ['north', 'south'] }, 'south')).toBe(true)
   expect(hasRegionAccess({ regions: 'north' }, 'north')).toBe(false)
   expect(() => teamCreationRegion({})).toThrow('region')
+})
+
+// These are executable contracts for the real client functions with an in-memory
+// Firestore adapter, not an assertion that the current live rules enforce them.
+const strictRollout = process.env.REGION_ROLLOUT_STRICT === '1'
+function seedPlayerJourney({ captain = 'player', teamRegion = 'north', sessionRegion = 'north' } = {}) {
+  docs.set('users/player', { role: 'player', teamId: 'a', regions: ['south'] })
+  docs.set('teams/a', { name: 'Alpha', regionId: teamRegion, captainId: captain })
+  docs.set('teams/a/members/player', { userId: 'player', status: 'member', role: captain === 'player' ? 'captain' : 'member' })
+  docs.set('sessions/night', { name: 'North night', regionId: sessionRegion, status: 'open', visibility: 'public', soldOut: false })
+}
+// Only application rejections count: incidental mock/infrastructure errors fail.
+async function applicationRejected(operation) {
+  try { await operation; return false } catch (error) {
+    if (error.name === 'ApiError') return true
+    throw error
+  }
+}
+it('a captain can register a team in its own region despite a different profile hint', async () => {
+  seedPlayerJourney()
+  await registerForGame('night', 6)
+  expect(docs.get('sessions/night/registrations/a')).toMatchObject({ teamId: 'a', regionId: 'north', teamSize: 6 })
+})
+it('teamless registration fails without any registration writes', async () => {
+  await expect(registerForGame('night', 6)).rejects.toMatchObject({ code: 'NO_TEAM' })
+  expect(setDoc).not.toHaveBeenCalled()
+})
+it('sold-out session rejects a stale registration attempt before writing', async () => {
+  seedPlayerJourney()
+  docs.set('sessions/night', { regionId: 'north', soldOut: true })
+  await expect(registerForGame('night', 6)).rejects.toMatchObject({ code: 'SOLD_OUT' })
+  expect(setDoc).not.toHaveBeenCalled()
+})
+it.each([
+  ['register', () => registerForGame('night', 6)],
+  ['confirm', () => confirmAttendance('night', 6)],
+  ['cancel', () => cancelRegistration('night')],
+])('PL-01 KNOWN GAP: an ordinary member cannot %s on behalf of the team', async (_action, invoke) => {
+  seedPlayerJourney({ captain: 'anotherPlayer' })
+  const denied = await applicationRejected(invoke())
+  expect(denied).toBe(strictRollout)
+  if (strictRollout) {
+    expect(setDoc).not.toHaveBeenCalled()
+    expect(updateDoc).not.toHaveBeenCalled()
+  }
+})
+it('PL-02 KNOWN GAP: a captain cannot register a team in another region', async () => {
+  seedPlayerJourney({ sessionRegion: 'south' })
+  expect(await applicationRejected(registerForGame('night', 6))).toBe(strictRollout)
+  if (strictRollout) expect(setDoc).not.toHaveBeenCalled()
+})
+it('PL-03 KNOWN GAP: teamless players receive no games and issue no sessions query', async () => {
+  docs.set('sessions/night', { regionId: 'north', status: 'open', visibility: 'public' })
+  const result = await getGames()
+  expect(result.games.map(game => game.id)).toEqual(strictRollout ? [] : ['night'])
+  if (strictRollout) expect(getDocs).not.toHaveBeenCalled()
+})
+it('PL-04 KNOWN GAP: game discovery queries and returns only the team region', async () => {
+  seedPlayerJourney()
+  docs.set('sessions/foreign', { regionId: 'south', status: 'open', visibility: 'public' })
+  const result = await getGames()
+  expect(result.games.map(game => game.id).sort()).toEqual(strictRollout ? ['night'] : ['foreign', 'night'])
+  if (strictRollout) {
+    const sessionQueries = getDocs.mock.calls.map(([q]) => q).filter(q => q.path === 'sessions')
+    expect(sessionQueries.length).toBeGreaterThan(0)
+    for (const q of sessionQueries) expect(q.filters).toContainEqual({ field: 'regionId', op: '==', value: 'north' })
+  }
+})
+
+it('cached team reads stay separated when accounts switch on a shared device', async () => {
+  docs.set('users/player', { teamId: 'a' })
+  docs.set('users/second', { teamId: 'b' })
+  expect(await getTeamId()).toBe('a')
+  auth.currentUser = { uid: 'second' }
+  expect(peekTeamId()).toBeUndefined()
+  expect(await getTeamId()).toBe('b')
+  expect(peekTeamId()).toBe('b')
+})
+it('team cache distinguishes unknown from a known teamless profile', async () => {
+  expect(peekTeamId()).toBeUndefined()
+  expect(await getTeamId()).toBeNull()
+  expect(peekTeamId()).toBeNull()
+})
+it('successful sign-out removes cached account and leaderboard data', async () => {
+  seedCache(cacheKey('getGames', 'player'), { games: ['old'] })
+  seedCache(cacheKey('getLeaderboards', 'north'), ['old standings'])
+  await logout()
+  expect(signOut).toHaveBeenCalledWith(auth)
+  expect(peekGames()).toBeUndefined()
+  expect(getStale(cacheKey('getLeaderboards', 'north'))).toBeUndefined()
+})
+it('signed-out render peeks are safe and reads reject authentication', async () => {
+  auth.currentUser = null
+  expect(peekGames()).toBeUndefined()
+  expect(peekDashboard()).toBeUndefined()
+  expect(peekTeamId()).toBeUndefined()
+  await expect(getGames()).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  await expect(registerForGame('night', 4)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  await expect(resendVerificationEmail()).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  expect(setDoc).not.toHaveBeenCalled()
+})
+it('password reset normalizes the email before sending', async () => {
+  await resetPassword('  Player@Example.COM ')
+  expect(sendPasswordResetEmail).toHaveBeenCalledWith(auth, 'player@example.com')
+})
+it('password reset maps Firebase invalid-email errors into application errors', async () => {
+  sendPasswordResetEmail.mockRejectedValueOnce({ code: 'auth/invalid-email' })
+  await expect(resetPassword('bad')).rejects.toMatchObject({ code: 'INVALID_EMAIL' })
+})
+it('verification targets the current authenticated user', async () => {
+  await resendVerificationEmail()
+  expect(sendEmailVerification).toHaveBeenCalledWith(auth.currentUser)
+})
+it('join request remains pending and does not silently assign a team', async () => {
+  const result = await requestToJoin('a')
+  expect(result.request).toMatchObject({ team_id: 'a', status: 'pending' })
+  expect(docs.get('teams/a/members/new-team')).toMatchObject({ userId: 'player', status: 'pending', role: 'member' })
+  expect(docs.get('users/player').teamId).toBeUndefined()
+})
+it('join request list excludes accepted members and other teams', async () => {
+  docs.set('teams/a/members/pending', { userId: 'applicant', status: 'pending', displayName: 'Applicant' })
+  docs.set('teams/a/members/accepted', { userId: 'member', status: 'member' })
+  docs.set('teams/b/members/foreign', { userId: 'foreign', status: 'pending' })
+  expect((await getJoinRequests('a')).requests).toEqual([expect.objectContaining({ id: 'pending', player_id: 'applicant', player_name: 'Applicant' })])
+})
+it('approval activates membership, assigns the applicant team and invalidates cached team state', async () => {
+  seedPlayerJourney()
+  docs.set('users/applicant', { teamId: null })
+  docs.set('teams/a/members/request', { userId: 'applicant', status: 'pending', displayName: 'Applicant' })
+  seedCache(cacheKey('getTeamId', 'player'), 'a')
+  seedCache(cacheKey('getGames', 'player'), { games: ['old'] })
+  const result = await handleJoinRequest('request', 'approve')
+  expect(docs.get('teams/a/members/request')).toMatchObject({ status: 'member', role: 'member' })
+  expect(docs.get('users/applicant').teamId).toBe('a')
+  expect(result.members).toContainEqual(expect.objectContaining({ player_id: 'applicant', status: 'active', is_captain: false }))
+  expect(peekTeamId()).toBeUndefined()
+  expect(peekGames()).toBeUndefined()
+})
+it('rejecting a join request removes only that request without assigning a team', async () => {
+  seedPlayerJourney()
+  docs.set('users/applicant', { teamId: null })
+  docs.set('teams/a/members/request', { userId: 'applicant', status: 'pending' })
+  await handleJoinRequest('request', 'reject')
+  expect(docs.has('teams/a/members/request')).toBe(false)
+  expect(docs.has('teams/a/members/player')).toBe(true)
+  expect(docs.get('users/applicant').teamId).toBeNull()
+})
+it('leaving removes all own legacy membership rows but preserves teammates and other teams', async () => {
+  seedPlayerJourney()
+  docs.set('teams/a/members/legacy', { userId: 'player', status: 'member' })
+  docs.set('teams/a/members/other', { userId: 'other', status: 'member' })
+  docs.set('teams/b/members/other', { userId: 'other', status: 'member' })
+  seedCache(cacheKey('getTeamId', 'player'), 'a')
+  await leaveTeam('a')
+  expect(docs.get('users/player').teamId).toBeNull()
+  expect(docs.has('teams/a/members/player')).toBe(false)
+  expect(docs.has('teams/a/members/legacy')).toBe(false)
+  expect(docs.has('teams/a/members/other')).toBe(true)
+  expect(docs.has('teams/b/members/other')).toBe(true)
+  expect(peekTeamId()).toBeUndefined()
 })
