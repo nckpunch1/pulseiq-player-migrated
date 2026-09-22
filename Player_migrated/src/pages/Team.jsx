@@ -1,3 +1,4 @@
+import { sendInviteEmail } from '../api/inviteEmail'
 import { regionSet } from '../lib/regionAccess'
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -434,27 +435,15 @@ export default function Team() {
           return
         }
 
-        const idToken = await auth.currentUser.getIdToken()
-
-        const res = await fetch(
-          'https://admin.pulseiq.com.au/api/send-invite',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-              toEmail: email,
-              captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
-              teamName: team?.name ?? 'the team',
-              teamId: team.id,
-            }),
-          }
-        )
+        const res = await sendInviteEmail({
+          toEmail: email,
+          captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
+          teamName: team?.name ?? 'the team',
+          teamId: team.id,
+        })
 
         if (res.ok) {
-          setInviteResult({ type: 'sent', message: `Invite sent to ${email} — they'll need to register first` })
+          setInviteResult({ type: 'sent', message: res.stubbed ? 'DEV: invitation simulated. No email was sent.' : `Invite sent to ${email} — they'll need to register first` })
           setInviteEmail('')
         } else if (res.status === 401 || res.status === 403) {
           setInviteResult({ type: 'error', message: "Couldn't send invite — please refresh and try again" })
