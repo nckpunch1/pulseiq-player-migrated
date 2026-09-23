@@ -986,8 +986,12 @@ export async function cancelRegistration(sessionId) {
   const teamId = await resolveTeamId(user.uid)
   if (!teamId) throw new ApiError('NO_TEAM', 'You are not on a team.')
 
+  // 'not_attending' is the current vocabulary for "we told you we aren't coming":
+  // AdminHost offers Reinstate for it, and the regional rules accept it from a
+  // captain. 'cancelled' is legacy-only (terminal in the admin UI) and is not
+  // accepted from players under the regional rules (RG-02).
   await updateDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId), {
-    attendanceStatus: 'cancelled',
+    attendanceStatus: 'not_attending',
   })
 
   invalidateTeamAndGameState()

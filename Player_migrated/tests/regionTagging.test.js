@@ -118,6 +118,12 @@ it('a captain can register a team in its own region despite a different profile 
   await registerForGame('night', 6)
   expect(docs.get('sessions/night/registrations/a')).toMatchObject({ teamId: 'a', regionId: 'north', teamSize: 6 })
 })
+it('RG-02: a captain cancel writes exactly the not_attending payload the regional rules accept', async () => {
+  seedPlayerJourney()
+  docs.set('sessions/night/registrations/a', { teamId: 'a', regionId: 'north', attendanceStatus: 'confirmed' })
+  await cancelRegistration('night')
+  expect(updateDoc).toHaveBeenCalledWith('sessions/night/registrations/a', { attendanceStatus: 'not_attending' })
+})
 it('teamless registration fails without any registration writes', async () => {
   await expect(registerForGame('night', 6)).rejects.toMatchObject({ code: 'NO_TEAM' })
   expect(setDoc).not.toHaveBeenCalled()
