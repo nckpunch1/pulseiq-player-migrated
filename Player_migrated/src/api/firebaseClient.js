@@ -626,20 +626,32 @@ export async function searchTeams(queryStr) {
 export async function requestToJoin(teamId) {
   const user = requireUser()
   const userData = await getUserDoc(user.uid)
-  const memberRef = doc(collection(firestore, 'teams', teamId, 'members'))
+  // Keyed on uid, like every other member row: the regional rules resolve
+  // membership with exists(members/{uid}), so a random-ID row is invisible to
+  // them once approved. userId stays as a field for the existing queries.
+  const memberRef = doc(firestore, 'teams', teamId, 'members', user.uid)
 
-  await setDoc(memberRef, {
-    userId: user.uid,
-    status: 'pending',
-    role: 'member',
-    displayName: userData.displayName ?? '',
-    username: userData.username ?? '',
-    requestedAt: serverTimestamp(),
-  })
+  try {
+    await setDoc(memberRef, {
+      userId: user.uid,
+      status: 'pending',
+      role: 'member',
+      displayName: userData.displayName ?? '',
+      username: userData.username ?? '',
+      requestedAt: serverTimestamp(),
+    })
+  } catch (err) {
+    // A second request finds the row already there, and the rules treat that
+    // set as a captain-only update. Only then is the existing row read.
+    if (err?.code !== 'permission-denied') throw err
+    const existing = (await getDoc(memberRef).catch(() => null))?.data()
+    if (existing?.status === 'member') throw new ApiError('ALREADY_MEMBER', 'You are already on this team.')
+    if (existing?.status !== 'pending') throw err
+  }
 
   invalidateTeamAndGameState()
 
-  return { request: { id: memberRef.id, team_id: teamId, status: 'pending' } }
+  return { request: { id: user.uid, team_id: teamId, status: 'pending' } }
 }
 
 export async function getJoinRequests(teamId) {

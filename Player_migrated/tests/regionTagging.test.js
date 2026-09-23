@@ -216,9 +216,27 @@ it('verification targets the current authenticated user', async () => {
 })
 it('join request remains pending and does not silently assign a team', async () => {
   const result = await requestToJoin('a')
-  expect(result.request).toMatchObject({ team_id: 'a', status: 'pending' })
-  expect(docs.get('teams/a/members/new-team')).toMatchObject({ userId: 'player', status: 'pending', role: 'member' })
+  expect(result.request).toMatchObject({ id: 'player', team_id: 'a', status: 'pending' })
+  // RG-01: the row is keyed on the requester's uid, never a generated ID.
+  expect(docs.get('teams/a/members/player')).toMatchObject({ userId: 'player', status: 'pending', role: 'member', requestedAt: 'TIME' })
+  expect([...docs.keys()].filter(p => p.startsWith('teams/a/members/'))).toEqual(['teams/a/members/player'])
   expect(docs.get('users/player').teamId).toBeUndefined()
+})
+it('a repeated join request is idempotent when the rules deny re-setting the existing pending row', async () => {
+  docs.set('teams/a/members/player', { userId: 'player', status: 'pending', role: 'member' })
+  setDoc.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+  expect((await requestToJoin('a')).request).toMatchObject({ id: 'player', status: 'pending' })
+  expect(docs.get('teams/a/members/player').status).toBe('pending')
+})
+it('a join request never downgrades an accepted member to pending', async () => {
+  docs.set('teams/a/members/player', { userId: 'player', status: 'member', role: 'member' })
+  setDoc.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+  await expect(requestToJoin('a')).rejects.toMatchObject({ code: 'ALREADY_MEMBER' })
+  expect(docs.get('teams/a/members/player').status).toBe('member')
+})
+it('unrelated join-request failures are not swallowed', async () => {
+  setDoc.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+  await expect(requestToJoin('a')).rejects.toThrow('denied')
 })
 it('join request list excludes accepted members and other teams', async () => {
   docs.set('teams/a/members/pending', { userId: 'applicant', status: 'pending', displayName: 'Applicant' })
