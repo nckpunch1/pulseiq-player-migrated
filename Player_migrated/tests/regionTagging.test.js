@@ -12,13 +12,14 @@ vi.mock('firebase/firestore', () => {
   const key = ref => ref.path ?? ref
   return {
     collection: path, collectionGroup: path,
-    query: (p, ...filters) => ({ path: p, filters }), where: (field, op, value) => ({ field, op, value }), limit: vi.fn(),
+    query: (p, ...filters) => ({ path: p, filters: filters.filter(Boolean) }), where: (field, op, value) => ({ field, op, value }), limit: vi.fn(),
     doc: (base, ...parts) => parts.length ? path(base, ...parts) : { id: 'new-team', path: `${base}/new-team` },
     getDoc: vi.fn(async ref => ({ exists: () => docs.has(key(ref)), data: () => docs.get(key(ref)) })),
     getDocs: vi.fn(async ref => {
       const prefix = `${key(ref)}/`
       const entries = [...docs].filter(([p, data]) => p.startsWith(prefix) && !p.slice(prefix.length).includes('/')
-        && (ref.filters ?? []).every(({ field, op, value }) => op === 'in' ? value.includes(data[field]) : data[field] === value))
+        && (ref.filters ?? []).every(({ field, op, value }) => op === 'in' ? value.includes(data[field])
+          : op === '>=' ? data[field] >= value : op === '<=' ? data[field] <= value : data[field] === value))
       return { docs: entries.map(([p, data]) => ({ id: p.split('/').at(-1), ref: p, data: () => data })) }
     }), serverTimestamp: () => 'TIME',
     setDoc: vi.fn(async (ref, data) => docs.set(key(ref), data)),
@@ -30,8 +31,9 @@ vi.mock('firebase/firestore', () => {
     },
   }
 })
-import { createTeam, registerForGame, register, getGames, confirmAttendance, cancelRegistration, getTeamId, peekTeamId, peekGames, peekDashboard, logout, resetPassword, resendVerificationEmail, requestToJoin, getJoinRequests, handleJoinRequest, leaveTeam } from '../src/api/firebaseClient'
+import { searchTeams, createTeam, registerForGame, register, getGames, confirmAttendance, cancelRegistration, getTeamId, peekTeamId, peekGames, peekDashboard, logout, resetPassword, resendVerificationEmail, requestToJoin, getJoinRequests, handleJoinRequest, leaveTeam } from '../src/api/firebaseClient'
 import { getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { isAcceptedMemberRow } from '../src/lib/membership'
 import { signOut, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth'
 import { clear, cacheKey, set as seedCache, getStale } from '../src/api/cache'
 import { hasRegionAccess, regionSet, teamCreationRegion } from '../src/lib/regionAccess'
@@ -279,4 +281,36 @@ it('leaving removes all own legacy membership rows but preserves teammates and o
   expect(docs.has('teams/a/members/other')).toBe(true)
   expect(docs.has('teams/b/members/other')).toBe(true)
   expect(peekTeamId()).toBeUndefined()
+})
+
+// Team discovery: scoped to the PROFILE region in the query itself.
+function seedDiscovery() {
+  docs.set('users/player', { role: 'player', teamId: null, regions: ['north'] })
+  docs.set('teams/northAlpha', { name: 'Alpha', nameLower: 'alpha', regionId: 'north', memberCount: 3, captainName: 'N' })
+  docs.set('teams/southAlpha', { name: 'Alpha', nameLower: 'alpha', regionId: 'south', memberCount: 5, captainName: 'S' })
+  docs.set('teams/northBeta', { name: 'Beta', nameLower: 'beta', regionId: 'north' })
+}
+it('searchTeams region-scopes the QUERY to the profile region, so same-name teams elsewhere never appear', async () => {
+  seedDiscovery()
+  const { teams } = await searchTeams('Alp')
+  expect(teams).toEqual([{ id: 'northAlpha', name: 'Alpha', region_id: 'north', member_count: 3, captain_name: 'N' }])
+  const [ref] = getDocs.mock.calls.at(-1)
+  expect(ref.path).toBe('teams')
+  expect(ref.filters).toContainEqual({ field: 'regionId', op: '==', value: 'north' })
+})
+it('a multi-region profile searches only its own regions', async () => {
+  seedDiscovery()
+  docs.set('users/player', { role: 'player', teamId: null, regions: ['north', 'east'] })
+  expect((await searchTeams('alpha')).teams.map(t => t.id)).toEqual(['northAlpha'])
+  expect(getDocs.mock.calls.at(-1)[0].filters).toContainEqual({ field: 'regionId', op: 'in', value: ['north', 'east'] })
+})
+it.each([[[]], [undefined], ['north'], [['', '  ']]])('a region-less profile (%j) gets no global search, just a needs_region signal', async regions => {
+  seedDiscovery()
+  docs.set('users/player', { role: 'player', teamId: null, regions })
+  expect(await searchTeams('alpha')).toEqual({ teams: [], needs_region: true })
+  expect(getDocs).not.toHaveBeenCalled()
+})
+it('only an accepted member row can assign a team (pending requests never do)', () => {
+  const row = status => ({ data: () => (status === undefined ? { userId: 'p' } : { userId: 'p', status }) })
+  expect([row('member'), row(undefined), row('pending'), row('rejected'), row('removed')].map(isAcceptedMemberRow)).toEqual([true, true, false, false, false])
 })

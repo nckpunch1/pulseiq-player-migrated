@@ -8,6 +8,7 @@ import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 import './team.css'
+import { isAcceptedMemberRow } from '../lib/membership'
 
 export default function Team() {
   const { setSessionFromResponse } = useAuth()
@@ -198,9 +199,11 @@ export default function Team() {
       let processingMemberWatch = false
       unsubMemberWatch = onSnapshot(membersQuery, async (snap) => {
         if (snap.empty || processingMemberWatch) return
+        // Only an ACCEPTED row assigns a team: a pending request must not.
+        const memberDoc = snap.docs.find(isAcceptedMemberRow)
+        if (!memberDoc) return
         processingMemberWatch = true
         try {
-          const memberDoc = snap.docs[0]
           const teamId = memberDoc.ref.parent.parent.id
           const currentSnap = await getDoc(
             doc(firestore, 'users', firebaseUser.uid)
@@ -227,8 +230,8 @@ export default function Team() {
             collectionGroup(firestore, 'members'),
             where('userId', '==', firebaseUser.uid)
           ))
-          if (snap.empty) return
-          const memberDoc = snap.docs[0]
+          const memberDoc = snap.docs.find(isAcceptedMemberRow)
+          if (!memberDoc) return
           const foundTeamId = memberDoc.ref.parent.parent.id
           const userSnap = await getDoc(
             doc(firestore, 'users', firebaseUser.uid)
@@ -339,6 +342,10 @@ export default function Team() {
     setSearchResults(null)
     try {
       const data = await api.searchTeams(q)
+      if (data.needs_region) {
+        setSearchError("Your account doesn't have a home region yet, so team search isn't available. Ask an admin to set your region, or create a team instead.")
+        return
+      }
       setSearchResults(data.teams ?? [])
     } catch (err) {
       setSearchError(err.message ?? 'Search failed.')
@@ -773,8 +780,8 @@ export default function Team() {
                 collectionGroup(firestore, 'members'),
                 where('userId', '==', auth.currentUser?.uid)
               ))
-              if (snap.empty) return
-              const memberDoc = snap.docs[0]
+              const memberDoc = snap.docs.find(isAcceptedMemberRow)
+              if (!memberDoc) return
               const foundTeamId = memberDoc.ref.parent.parent.id
               await updateDoc(
                 doc(firestore, 'users', auth.currentUser.uid),

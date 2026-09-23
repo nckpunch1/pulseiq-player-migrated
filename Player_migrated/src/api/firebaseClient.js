@@ -1,4 +1,4 @@
-import { teamCreationRegion, requireRegionId } from '../lib/regionAccess'
+import { teamCreationRegion, requireRegionId, regionSet } from '../lib/regionAccess'
 import {
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -596,14 +596,28 @@ export async function createTeam(teamName, selectedRegionId) {
   return { team, membership }
 }
 
+// Team discovery is scoped to the caller's PROFILE region (the discovery tenant
+// chosen at signup) in the QUERY itself, not by filtering results afterwards:
+// the regional rules only let a teamless player read teams in that region, and
+// same-name teams in other regions can never appear. The team's own region still
+// governs game data once the player joins.
 export async function searchTeams(queryStr) {
   const q = queryStr.toLowerCase().trim()
   if (!q) return { teams: [] }
 
-  // Range query on pre-computed nameLower — O(results) reads, not O(all teams)
+  const user = requireUser()
+  const regions = regionSet(await getUserDoc(user.uid))
+  // Region-less profiles (pre-backfill accounts) cannot be scoped, so nothing is
+  // searched rather than falling back to a global query.
+  if (!regions.length) return { teams: [], needs_region: true }
+  const inRegion = regions.length === 1 ? where('regionId', '==', regions[0]) : where('regionId', 'in', regions.slice(0, 30))
+
+  // Range query on pre-computed nameLower within the region — O(results) reads.
+  // Needs the teams (regionId ASC, nameLower ASC) composite index.
   const snap = await getDocs(
     query(
       collection(firestore, 'teams'),
+      inRegion,
       where('nameLower', '>=', q),
       where('nameLower', '<=', q + ''),
       limit(20),
@@ -615,6 +629,7 @@ export async function searchTeams(queryStr) {
     return {
       id: d.id,
       name: data.name,
+      region_id: data.regionId ?? null,
       // memberCount and captainName are denormalized on the team doc
       member_count: data.memberCount ?? 0,
       captain_name: data.captainName ?? '',
