@@ -4,7 +4,7 @@ const { docs, auth } = vi.hoisted(() => ({ docs: new Map(), auth: { currentUser:
 vi.mock('../src/lib/firebase', () => ({ firestore: {}, db: {}, auth }))
 vi.mock('firebase/auth', () => ({
   sendEmailVerification: vi.fn(), sendPasswordResetEmail: vi.fn(), signInWithEmailAndPassword: vi.fn(),
-  createUserWithEmailAndPassword: vi.fn(async () => ({ user: { uid: 'new-player' } })), signOut: vi.fn(),
+  createUserWithEmailAndPassword: vi.fn(async () => ({ user: { uid: 'new-player' } })), deleteUser: vi.fn(async () => {}), signOut: vi.fn(),
 }))
 vi.mock('firebase/database', () => ({ ref: vi.fn(), onValue: vi.fn() }))
 vi.mock('firebase/firestore', () => {
@@ -61,9 +61,14 @@ it('rejects a nonexistent explicit region without creating a team', async () => 
   await expect(createTeam('Alpha', 'missing')).rejects.toThrow('existing region')
   expect(docs.has('teams/new-team')).toBe(false)
 })
-it('creates new profiles with array-valued region access, without assigning a guessed region', async () => {
-  await register({ first_name: 'A', last_name: 'B', email: 'a@example.com', password: 'test-only' })
-  expect(docs.get('users/new-player').regions).toEqual([])
+it('creates new profiles with exactly the region the player selected, as a doc-ID array', async () => {
+  await register({ first_name: 'A', last_name: 'B', email: 'a@example.com', password: 'test-only', region_id: 'south' })
+  expect(docs.get('users/new-player').regions).toEqual(['south'])
+})
+it('signup never guesses a region: none selected, or one that does not exist, creates no profile', async () => {
+  await expect(register({ first_name: 'A', last_name: 'B', email: 'a@example.com', password: 'test-only' })).rejects.toMatchObject({ code: 'REGION_REQUIRED' })
+  await expect(register({ first_name: 'A', last_name: 'B', email: 'a@example.com', password: 'test-only', region_id: 'missing' })).rejects.toMatchObject({ code: 'REGION_NOT_FOUND' })
+  expect(docs.has('users/new-player')).toBe(false)
 })
 it('tags registrations from the session, not the team or profile', async () => {
   docs.set('users/player', { teamId: 'a', regions: ['north'] })

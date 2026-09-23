@@ -4,6 +4,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  deleteUser,
   signOut,
 } from 'firebase/auth'
 import {
@@ -149,13 +150,31 @@ export async function login({ email, password }) {
   }
 }
 
-export async function register({ first_name, last_name, email, password }) {
+// region_id is the player's discovery/routing tenant: it owns the profile and
+// will scope team search and request routing. It does NOT grant game-data
+// access, which stays derived from the team. Exactly one existing region is
+// required, and the users-create rule enforces the same thing server-side.
+// After signup the region is admin-only; players cannot edit it.
+export async function register({ first_name, last_name, email, password, region_id }) {
   const normalizedEmail = email.toLowerCase().trim()
+  // Checked before an auth account exists, so a missing region creates nothing.
+  if (typeof region_id !== 'string' || !region_id || region_id.includes('/')) {
+    throw new ApiError('REGION_REQUIRED', 'Select your region.')
+  }
+
+  let cred
+  try {
+    cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
+  } catch (err) {
+    throw mapAuthError(err)
+  }
+  const uid = cred.user.uid
+  const displayName = `${first_name} ${last_name}`.trim()
 
   try {
-    const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
-    const uid = cred.user.uid
-    const displayName = `${first_name} ${last_name}`.trim()
+    // Region docs are readable only once signed in, so existence is checked here.
+    const region = await getDoc(doc(firestore, 'regions', region_id))
+    if (!region.exists()) throw new ApiError('REGION_NOT_FOUND', 'Select an existing region.')
 
     await setDoc(doc(firestore, 'users', uid), {
       email: normalizedEmail,
@@ -165,29 +184,36 @@ export async function register({ first_name, last_name, email, password }) {
       lastName: last_name,
       username: normalizedEmail,
       role: 'player',
-      regions: [],
+      regions: [region_id],
       teamId: null,
       emailVerified: false,
       manuallyVerified: false,
       createdAt: serverTimestamp(),
     })
+  } catch (err) {
+    // No profile was stored: remove the fresh auth account so the email is not
+    // left registered to a profile-less user who could never sign up again.
+    await deleteUser(cred.user).catch(() => {})
+    throw err instanceof ApiError ? err : mapAuthError(err)
+  }
 
+  try {
     await sendEmailVerification(cred.user)
-
-    return {
-      player: {
-        id: uid,
-        email: normalizedEmail,
-        display_name: displayName,
-        first_name,
-        last_name,
-        emailVerified: false,
-      },
-      player_session_token: uid,
-      requiresVerification: true,
-    }
   } catch (err) {
     throw mapAuthError(err)
+  }
+
+  return {
+    player: {
+      id: uid,
+      email: normalizedEmail,
+      display_name: displayName,
+      first_name,
+      last_name,
+      emailVerified: false,
+    },
+    player_session_token: uid,
+    requiresVerification: true,
   }
 }
 

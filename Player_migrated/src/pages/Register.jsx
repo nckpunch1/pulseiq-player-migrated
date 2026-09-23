@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth.jsx'
 import './auth.css'
 
-function validate({ firstName, lastName, email, password, confirmPassword }) {
+function validate({ firstName, lastName, email, password, confirmPassword, regionId }) {
   const errors = {}
+  if (!regionId) errors.regionId = 'Please choose your region'
   if (!firstName.trim()) errors.firstName = 'Required'
   if (!lastName.trim())  errors.lastName  = 'Required'
   if (!email.trim())                   errors.email = 'Email is required'
@@ -22,13 +23,24 @@ export default function Register() {
   const navigate = useNavigate()
 
   const [fields, setFields] = useState({
-    firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', regionId: '',
   })
+  // Your home region: it decides which teams and requests you are routed to.
+  // Set once here; only an admin can change it later.
+  const [regionChoices, setRegionChoices]     = useState([])
+  const [regionLoadError, setRegionLoadError] = useState('')
   const [errors, setErrors]                   = useState({})
   const [serverError, setServerError]         = useState('')
   const [submitting, setSubmitting]           = useState(false)
   const [awaitingVerification, setAwaitingVerification] = useState(false)
   const [resendCooldown, setResendCooldown]   = useState(0)
+
+  useEffect(() => {
+    let active = true
+    api.listRegions().then(rows => { if (active) setRegionChoices(rows) })
+      .catch(() => { if (active) setRegionLoadError('Could not load regions. Please reload to try again.') })
+    return () => { active = false }
+  }, [])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -64,6 +76,7 @@ export default function Register() {
         last_name:  fields.lastName.trim(),
         email:      fields.email.trim(),
         password:   fields.password,
+        region_id:  fields.regionId,
       })
       if (data.requiresVerification) {
         setSessionFromResponse(data)
@@ -158,6 +171,23 @@ export default function Register() {
                 />
                 {errors.lastName && <span className="auth-field-error">{errors.lastName}</span>}
               </div>
+            </div>
+
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="reg-region">Region</label>
+              <select
+                id="reg-region"
+                name="regionId"
+                required
+                className={`auth-input${errors.regionId ? ' auth-input--error' : ''}`}
+                value={fields.regionId}
+                onChange={handleChange}
+              >
+                <option value="" disabled>Select your region</option>
+                {regionChoices.map(region => <option key={region.id} value={region.id}>{region.name}</option>)}
+              </select>
+              {errors.regionId && <span className="auth-field-error">{errors.regionId}</span>}
+              {regionLoadError && <span className="auth-field-error" role="alert">{regionLoadError}</span>}
             </div>
 
             <div className="auth-field">
