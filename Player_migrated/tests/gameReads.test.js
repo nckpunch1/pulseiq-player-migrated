@@ -27,8 +27,9 @@ vi.mock('firebase/firestore', () => {
     setDoc: vi.fn(), deleteDoc: vi.fn(), writeBatch: vi.fn(), serverTimestamp: vi.fn(),
   }
 })
+import { ref, onValue } from 'firebase/database'
 import { getDoc, getDocs, updateDoc } from 'firebase/firestore'
-import { getGameDetails, getSeasonLeaderboard, getLeaderboards, listRegions } from '../src/api/firebaseClient'
+import { getGameDetails, getSeasonLeaderboard, getLeaderboards, listRegions, getPaperLiveState } from '../src/api/firebaseClient'
 import { clear } from '../src/api/cache'
 beforeEach(() => {
   vi.clearAllMocks(); records.clear(); clear()
@@ -126,4 +127,25 @@ it('lists region IDs/names and deduplicates repeated discovery reads', async () 
   expect(await listRegions()).toEqual([{ id: 'north', name: 'North' }])
   await listRegions()
   expect(getDocs).toHaveBeenCalledTimes(1)
+})
+
+it('live-state adapter forwards snapshots and returns the Firebase unsubscribe handle', () => {
+  const unsubscribe = vi.fn(), onData = vi.fn()
+  ref.mockReturnValueOnce('live-ref')
+  onValue.mockReturnValueOnce(unsubscribe)
+  const stop = getPaperLiveState('night', onData)
+  expect(ref).toHaveBeenCalledWith({}, 'liveSessions/night')
+  expect(onValue).toHaveBeenCalledWith('live-ref', expect.any(Function), expect.any(Function))
+  const [, next, error] = onValue.mock.calls[0]
+  next({ val: () => ({ phase: 'question' }) })
+  next({ val: () => null })
+  expect(onData.mock.calls).toEqual([[{ phase: 'question' }], [null]])
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    error(new Error('offline'))
+    expect(onData).toHaveBeenCalledTimes(2)
+    expect(stop).toBe(unsubscribe)
+    stop()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  } finally { warn.mockRestore() }
 })
