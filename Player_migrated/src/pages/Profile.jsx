@@ -7,8 +7,8 @@ import {
   EmailAuthProvider,
   signOut,
 } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
-import { auth, firestore } from '../lib/firebase'
+import { auth } from '../lib/firebase'
+import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth.jsx'
 import './profile.css'
 
@@ -42,7 +42,7 @@ export default function Profile() {
       }
       const userId = player?.id ?? player?.user_id
       if (userId) {
-        await setDoc(doc(firestore, 'users', String(userId)), { display_name: trimmed }, { merge: true })
+        await api.updateDisplayName(userId, trimmed)
       }
       setSessionFromResponse({ player: { ...player, display_name: trimmed } })
       setNameSuccess('Display name updated.')

@@ -217,6 +217,13 @@ export async function register({ first_name, last_name, email, password, region_
   }
 }
 
+// Profile display name, as Profile.jsx has always written it. NOTE (INT-01): the
+// field is `display_name`, but every reader uses `displayName`, and the regional
+// rules only allow `displayName`; kept as-is here and pinned by the integration suite.
+export async function updateDisplayName(userId, name) {
+  await setDoc(doc(firestore, 'users', String(userId)), { display_name: name }, { merge: true })
+}
+
 export async function me() {
   const user = requireUser()
   const userData = await getUserDoc(user.uid)

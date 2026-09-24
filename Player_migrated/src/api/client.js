@@ -11,6 +11,7 @@ import {
   login,
   register,
   me,
+  updateDisplayName,
   logout,
   resendVerificationEmail,
   resetPassword,
@@ -63,6 +64,9 @@ export const api = {
   // Cache — for the one mutation that writes Firestore directly rather than
   // going through this client (Team.jsx's "Been approved? Tap to refresh").
   invalidateTeamAndGameState,
+
+  // Profile
+  updateDisplayName: (userId, name) => updateDisplayName(userId, name),
 
   // Team
   getTeamId,
