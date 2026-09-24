@@ -1,0 +1,40 @@
+name: Regression tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Player_migrated
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Player_migrated/package-lock.json
+      - run: npm ci
+      # Match AdminHost's scoped lint gate; whole-app lint has existing failures.
+      - name: Lint tests and Vitest configuration
+        run: npx --no-install eslint tests vitest.config.js
+      # Emulator integration tests run separately and need the AdminHost repo.
+      - name: Run regression tests and coverage gates
+        run: npm run test:coverage
+      - name: Check production build
+        run: npm run build
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-coverage
+          path: Player_migrated/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
