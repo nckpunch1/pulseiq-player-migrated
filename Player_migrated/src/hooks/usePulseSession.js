@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ref, onValue, set } from 'firebase/database'
 import { db } from '../lib/firebase'
 
@@ -8,36 +8,31 @@ import { db } from '../lib/firebase'
  * Only activates when teamId and knownSessionId are both non-null.
  */
 export function usePulseSession(teamId, knownSessionId = null) {
-  const [sessionId, setSessionId] = useState(null)
-  const [sessionData, setSessionData] = useState(null)
+  const sessionId = teamId ? knownSessionId : null
+  // Each subscription has its own identity, including when returning to an ID
+  // visited earlier. Never render a snapshot from a previous subscription.
+  const subscription = useMemo(() => ({ sessionId }), [sessionId])
+  const [snapshot, setSnapshot] = useState(null)
+  const sessionData = snapshot?.subscription === subscription ? snapshot.data : null
 
-  // Step 1 — resolve the session ID
   useEffect(() => {
-    if (!teamId) {
-      setSessionId(null)
-      setSessionData(null)
-      return
-    }
-    setSessionId(knownSessionId ?? null)
-  }, [teamId, knownSessionId])
-
-  // Step 2 — watch the full session once we have a sessionId
-  useEffect(() => {
-    if (!sessionId) {
-      setSessionData(null)
-      return
-    }
-
+    if (!sessionId) return
+    let active = true
     const sessRef = ref(db, `pulseSessions/${sessionId}`)
     const unsub = onValue(
       sessRef,
-      (snap) => setSessionData(snap.exists() ? snap.val() : null),
+      (snap) => {
+        if (active) setSnapshot({ subscription, data: snap.exists() ? snap.val() : null })
+      },
       (err) => {
-        if (import.meta.env.DEV) console.warn('[Pulse] session error:', err.message)
+        if (active && import.meta.env.DEV) console.warn('[Pulse] session error:', err.message)
       },
     )
-    return unsub
-  }, [sessionId])
+    return () => {
+      active = false
+      unsub()
+    }
+  }, [sessionId, subscription])
 
   async function submitAnswer(answer) {
     if (!sessionId || !teamId) return

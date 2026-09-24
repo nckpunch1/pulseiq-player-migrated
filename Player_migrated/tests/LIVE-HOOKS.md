@@ -6,6 +6,8 @@ Paper coverage: exact subscription path, first snapshot/loading, ten-second fall
 
 Pulse coverage: both IDs required, snapshots/deletions/errors, numeric submissions to the active team/session, rejected writes, team changes, leaving a team, session changes and listener cleanup.
 
-Two explicit expected-failure regressions expose stale state when changing IDs: Paper retains the previous game's liveState/teamId; Pulse retains the previous sessionData until another snapshot arrives. These are not skipped tests or claims that the hooks are safe across transitions. Clear old state on ID changes, then convert the cases to normal tests when that work is authorized. Runtime behaviour was not modified.
+Fixed: Pulse snapshots are tied to each subscription, so switching sessions or revisiting a session starts with null data. Late callbacks from an unsubscribed listener cannot overwrite the active snapshot. Normal regressions cover these transitions and the current submission path.
 
-No Firebase project or network is used. These tests do not verify deployed RTDB authorization, numeric-input validity, late callbacks after unsubscribe, or real concurrent clients. Full suite reports include the expected-failure cases.
+Fixed: Paper also scopes snapshots, timestamps, failure counts and timeout state to each subscription. A new game starts empty with a fresh ten-second loading fallback. Removing the game ID clears state and stops loading. Retired callbacks are ignored, while errors within the same game retain its last good snapshot. All hook gap regressions are now normal passing tests.
+
+No Firebase project or network is used. These tests do not verify deployed RTDB authorization, numeric-input validity, real concurrent clients. Full suite reports include the expected-failure cases.
