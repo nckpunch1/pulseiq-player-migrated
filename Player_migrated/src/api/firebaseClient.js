@@ -8,6 +8,7 @@ import {
   signOut,
 } from 'firebase/auth'
 import {
+  addDoc,
   collection,
   collectionGroup,
   doc,
@@ -217,11 +218,12 @@ export async function register({ first_name, last_name, email, password, region_
   }
 }
 
-// Profile display name, as Profile.jsx has always written it. NOTE (INT-01): the
-// field is `display_name`, but every reader uses `displayName`, and the regional
-// rules only allow `displayName`; kept as-is here and pinned by the integration suite.
+// Profile display name. `displayName` is the field every reader uses and the one
+// the regional rules let a player change on their own profile (INT-01; the old
+// snake_case `display_name` was never read).
 export async function updateDisplayName(userId, name) {
-  await setDoc(doc(firestore, 'users', String(userId)), { display_name: name }, { merge: true })
+  await updateDoc(doc(firestore, 'users', String(userId)), { displayName: name })
+  invalidate('dashboard')
 }
 
 export async function me() {
@@ -306,8 +308,10 @@ export function peekTeamId() {
   return uid ? getStale(cacheKey('getTeamId', uid)) : undefined
 }
 
-export function peekLeaderboards(regionId) {
-  return getStale(cacheKey('getLeaderboards', regionId ?? null))
+// Keyed on uid: the leaderboard shown is always the viewer's own team region.
+export function peekLeaderboards() {
+  const user = auth.currentUser
+  return user ? getStale(cacheKey('getLeaderboards', user.uid)) : undefined
 }
 
 export function peekSeasonLeaderboard(seasonId, regionId) {
@@ -324,17 +328,44 @@ export function peekSeasonLeaderboard(seasonId, regionId) {
 // sessionId. Callers only look up the sessions they are rendering, so rows for
 // past sessions come back and are simply never read — the trade is a read count
 // linear in the team's history rather than in the number of open sessions.
-async function getTeamRegistrationsBySession(teamId) {
-  if (!teamId) return new Map()
-  const snap = await getDocs(query(
-    collectionGroup(firestore, 'registrations'),
-    where('teamId', '==', teamId),
+// ─── Region scoping ────────────────────────────────────────────────────────────
+//
+// A player's DATA region is their team's region; profile.regions is only the
+// discovery scope (team search, team requests). Every game/leaderboard query is
+// constrained to the team region in the QUERY itself, because the regional rules
+// refuse any query they cannot prove stays in the caller's region. A teamless
+// player, or a stale teamId the rules no longer back, has no data region.
+
+const OPEN_SESSION_STATUSES = ['open', 'scheduled', 'live']
+
+async function teamRegionContext(uid) {
+  const userData = await getUserDoc(uid)
+  const teamId = userData.teamId ?? null
+  if (!teamId) return { userData, teamId: null, team: null, regionId: null }
+  const team = await getDoc(doc(firestore, 'teams', teamId))
+    .then(snap => (snap.exists() ? snap.data() : null))
+    .catch(() => null) // e.g. a stale teamId: the rules refuse the team read
+  const regionId = typeof team?.regionId === 'string' && team.regionId ? team.regionId : null
+  return { userData, teamId: team ? teamId : null, team, regionId }
+}
+
+// Needs the sessions (regionId ASC, status ASC) index.
+function regionSessions(regionId) {
+  return getDocs(query(
+    collection(firestore, 'sessions'),
+    where('regionId', '==', regionId),
+    where('status', 'in', OPEN_SESSION_STATUSES),
   ))
+}
+
+// One document read per session instead of a collection-group query: the rules
+// allow a team to read its own registration in a session of its region, but not
+// every registration everywhere.
+async function teamRegistrations(teamId, sessionIds) {
+  const snaps = await Promise.all(sessionIds.map(id =>
+    getDoc(doc(firestore, 'sessions', id, 'registrations', teamId)).catch(() => null)))
   const bySession = new Map()
-  for (const d of snap.docs) {
-    const sessionId = d.ref.parent.parent?.id
-    if (sessionId) bySession.set(sessionId, d.data())
-  }
+  snaps.forEach((snap, i) => { if (snap?.exists()) bySession.set(sessionIds[i], snap.data()) })
   return bySession
 }
 
@@ -348,14 +379,8 @@ export async function dashboard() {
 
 async function dashboardUncached() {
   const user = requireUser()
-
-  // Sessions query doesn't need teamId — run it in parallel with the user doc read
-  const [userData, sessSnap] = await Promise.all([
-    getUserDoc(user.uid),
-    getDocs(query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live']))),
-  ])
+  const { userData, teamId, team: teamDoc, regionId } = await teamRegionContext(user.uid)
   const player = buildPlayer(user.uid, userData)
-  const teamId = userData.teamId ?? null
 
   let team = null
   let membership = null
@@ -363,16 +388,16 @@ async function dashboardUncached() {
   let leaderboard_summary = null
   const upcoming_games = []
 
-  if (teamId) {
-    // Registrations join this batch rather than running after it — teamId is
-    // already known here, so it costs no extra round trip.
-    const [teamSnap, myMemberSnap, regBySession] = await Promise.all([
-      getDoc(doc(firestore, 'teams', teamId)),
+  // Teamless (or a team with no region): no games or standings. Game data belongs
+  // to a team's region, so there is nothing the rules would let us show.
+  if (teamId && regionId) {
+    const [sessSnap, myMemberSnap] = await Promise.all([
+      regionSessions(regionId),
       getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('userId', '==', user.uid))),
-      getTeamRegistrationsBySession(teamId),
     ])
+    const regBySession = await teamRegistrations(teamId, sessSnap.docs.map(d => d.id))
 
-    const teamData = teamSnap.data() ?? {}
+    const teamData = teamDoc ?? {}
     const myMemberData = myMemberSnap.docs[0]?.data() ?? {}
     const isCaptain = teamData.captainId === user.uid
 
@@ -420,7 +445,7 @@ async function dashboardUncached() {
       isCaptain
         ? getDocs(query(collection(firestore, 'teams', teamId, 'members'), where('status', '==', 'pending')))
         : Promise.resolve(null),
-      getDocs(query(collection(firestore, 'seasons'), where('status', '==', 'active'), limit(1))).catch(() => null),
+      getDocs(query(collection(firestore, 'seasons'), where('regionId', '==', regionId), where('status', '==', 'active'), limit(1))).catch(() => null),
     ])
 
     if (reqSnap) {
@@ -447,7 +472,8 @@ async function dashboardUncached() {
         // the orphan/inactive exclusion) don't represent a standing.
         const lbSnap = await getDocs(query(
           collection(firestore, 'seasons', seasonId, 'leaderboard'),
-          where('teamId', '==', teamId)
+          where('teamId', '==', teamId),
+          where('regionId', '==', regionId),
         ))
         const entries = lbSnap.docs
           .map(d => d.data())
@@ -474,28 +500,6 @@ async function dashboardUncached() {
       // but not invisible either.
       console.warn('Dashboard season rank read failed:', e)
     }
-  } else {
-    // No team — list only public sessions without registration status
-    sessSnap.docs
-      .filter(d => {
-        const vis = d.data().visibility
-        return !vis || vis === 'public'
-      })
-      .forEach(d => {
-        const data = d.data()
-        upcoming_games.push({
-          id: d.id,
-          canonical_session_id: d.id,
-          name: data.name ?? '',
-          title: data.title,
-          venue: data.venue,
-          date: data.date ?? data.startsAt,
-          starts_at: tsToIso(data.startsAt),
-          status: data.status,
-          registration_status: 'not_registered',
-          team_name: null,
-        })
-      })
   }
 
   return {
@@ -706,14 +710,10 @@ export async function handleJoinRequest(memberId, action) {
   const approved = action === 'approve' || action === 'approved'
 
   if (approved) {
-    const memberSnap = await getDoc(memberRef)
-    const memberData = memberSnap.data() ?? {}
-    await Promise.all([
-      updateDoc(memberRef, { status: 'member', role: 'member', joinedAt: serverTimestamp() }),
-      memberData.userId
-        ? updateDoc(doc(firestore, 'users', memberData.userId), { teamId })
-        : Promise.resolve(),
-    ])
+    // Accepting the member row is all a captain may do. The applicant's own app
+    // adopts the team from the accepted row (Team.jsx watcher); a captain writing
+    // another player's profile is refused by the regional rules (INT-02).
+    await updateDoc(memberRef, { status: 'member', role: 'member', joinedAt: serverTimestamp() })
   } else {
     await deleteDoc(memberRef)
   }
@@ -745,6 +745,44 @@ export async function handleJoinRequest(memberId, action) {
   return { request: { id: memberId, status: action }, members }
 }
 
+// "I need a team": a request to the admins of the player's PROFILE region (the
+// discovery tenant chosen at signup). The region is required by the regional
+// rules and is what routes the request to that region's admins.
+export async function requestTeamFromAdmin(note = '') {
+  const user = requireUser()
+  const userData = await getUserDoc(user.uid)
+  const [regionId] = regionSet(userData)
+  if (!regionId) {
+    throw new ApiError('NEEDS_REGION', "Your account doesn't have a home region yet. Ask an admin to set your region.")
+  }
+  await addDoc(collection(firestore, 'teamRequests'), {
+    playerId: user.uid,
+    playerName: user.displayName ?? userData.displayName ?? userData.firstName ?? user.email?.split('@')[0] ?? 'Unknown',
+    playerEmail: user.email ?? '',
+    regionId,
+    note: String(note).trim(),
+    status: 'pending',
+    resolvedTeamId: null,
+    resolvedTeamName: null,
+    createdAt: serverTimestamp(),
+    resolvedAt: null,
+    resolvedBy: null,
+  })
+  return { request: { status: 'pending', region_id: regionId } }
+}
+
+// Withdraw the player's own pending "I need a team" request(s).
+export async function cancelTeamRequest() {
+  const user = requireUser()
+  const snap = await getDocs(query(
+    collection(firestore, 'teamRequests'),
+    where('playerId', '==', user.uid),
+    where('status', '==', 'pending'),
+  ))
+  await Promise.all(snap.docs.map(d => updateDoc(d.ref, { status: 'cancelled' })))
+  return { cancelled: snap.docs.length }
+}
+
 export async function leaveTeam(teamId) {
   const user = requireUser()
 
@@ -772,22 +810,19 @@ export async function getGames() {
 
 async function getGamesUncached() {
   const user = requireUser()
-
-  // Sessions query doesn't need teamId — run it in parallel with the user doc read
-  const [userData, sessSnap] = await Promise.all([
-    getUserDoc(user.uid),
-    getDocs(query(collection(firestore, 'sessions'), where('status', 'in', ['open', 'scheduled', 'live']))),
-  ])
-  const teamId = userData.teamId ?? null
-  const sessionDocs = sessSnap.docs
+  const { teamId, regionId } = await teamRegionContext(user.uid)
+  // Teamless (or a team with no region): no games. A player sees only their
+  // team's region, queried by region rather than filtered afterwards.
+  if (!teamId || !regionId) return { games: [] }
+  const sessionDocs = (await regionSessions(regionId)).docs
 
   // Deduplicate venue IDs so a shared venue is only read once across all sessions
   const uniqueVenueIds = [...new Set(sessionDocs.map(d => d.data().venueId).filter(Boolean))]
 
-  // All registrations (one collection-group query) + all unique venue reads in
+  // This team's registrations (one read per session) + all unique venue reads in
   // one parallel batch
   const [regBySession, venueSnaps] = await Promise.all([
-    getTeamRegistrationsBySession(teamId),
+    teamRegistrations(teamId, sessionDocs.map(d => d.id)),
     Promise.all(uniqueVenueIds.map(id =>
       getDoc(doc(firestore, 'venues', id)).catch(() => null)
     )),
@@ -954,13 +989,25 @@ export async function registerForGame(sessionId, teamSize) {
   // hides Register on sold-out sessions; this guards against a stale client.
   // NOTE: this is a soft guard only — authoritative enforcement belongs in
   // firestore.rules (follow-up).
-  const sessionSnap = await getDoc(doc(firestore, 'sessions', sessionId))
+  // Under the regional rules a session outside the team's region cannot even be
+  // read; that refusal means the same thing as the explicit check below.
+  const sessionSnap = await getDoc(doc(firestore, 'sessions', sessionId)).catch(err => {
+    if (err?.code === 'permission-denied') throw new ApiError('WRONG_REGION', "This game is in a different region from your team.")
+    throw err
+  })
   if (sessionSnap.data()?.soldOut === true) {
     throw new ApiError('SOLD_OUT', 'Session is sold out.')
   }
 
   const teamSnap = await getDoc(doc(firestore, 'teams', teamId))
   const teamName = teamSnap.data()?.name ?? ''
+  // A team plays only in its own region (the rules refuse anything else); say so
+  // before attempting the write rather than surfacing a permission error.
+  const teamRegionId = teamSnap.data()?.regionId ?? null
+  const sessionRegionId = sessionSnap.data()?.regionId ?? null
+  if (teamRegionId && sessionRegionId && teamRegionId !== sessionRegionId) {
+    throw new ApiError('WRONG_REGION', "This game is in a different region from your team.")
+  }
 
   const existingRegistration = await getDoc(doc(firestore, 'sessions', sessionId, 'registrations', teamId))
   const regionTag = existingRegistration.exists()
@@ -1090,15 +1137,17 @@ const fetchTeamSnapsByIds = async (teamIds) => {
 // (see the unbounded collectionGroup scan below). Leaderboard data is global, so
 // the key is the region only — no uid. The read-cost redesign is a separate pass;
 // this only stops paying it on every navigation.
-export async function getLeaderboards(regionId) {
-  return cached(
-    cacheKey('getLeaderboards', regionId ?? null),
-    TTL_MS,
-    () => getLeaderboardsUncached(regionId),
-  )
+// Leaderboards are game data, so they follow the TEAM region: a player sees their
+// own region's season and all-time tables. Teamless players have no standings.
+export async function getLeaderboards() {
+  const user = requireUser()
+  return cached(cacheKey('getLeaderboards', user.uid), TTL_MS, () => getLeaderboardsUncached(user.uid))
 }
 
-async function getLeaderboardsUncached(regionId) {
+async function getLeaderboardsUncached(uid) {
+  const { regionId } = await teamRegionContext(uid)
+  if (!regionId) return { current_season: null, all_time_leaderboard: [], region_id: null }
+
   // Both reads are independent — fire them in parallel.
   // Each has its own .catch() so one failure doesn't suppress the other.
   // NOTE: collectionGroup('leaderboard') requires the 'leaderboard' collection group
@@ -1107,11 +1156,13 @@ async function getLeaderboardsUncached(regionId) {
   // Read cost: 1 (seasons) + N_seasons × N_teams (all leaderboard docs), e.g. 101 reads
   // for 5 seasons × 20 teams. No in-memory cache — re-fetched on every page mount.
   const [seasonSnap, allTimeSnap] = await Promise.all([
-    getDocs(query(collection(firestore, 'seasons'), where('status', '==', 'active'))).catch(e => {
+    getDocs(query(collection(firestore, 'seasons'), where('regionId', '==', regionId), where('status', '==', 'active'))).catch(e => {
       console.error('getLeaderboards season error:', e)
       return null
     }),
-    getDocs(collectionGroup(firestore, 'leaderboard')).catch(e => {
+    // Region-constrained collection-group query (needs the leaderboard.regionId
+    // collection-group index); an unconstrained one is refused by the rules.
+    getDocs(query(collectionGroup(firestore, 'leaderboard'), where('regionId', '==', regionId))).catch(e => {
       console.error('getLeaderboards all-time error:', e)
       return null
     }),
@@ -1174,6 +1225,7 @@ async function getLeaderboardsUncached(regionId) {
     current_season,
     current_season_leaderboard: [],
     all_time_leaderboard,
+    region_id: regionId,
   }
 }
 

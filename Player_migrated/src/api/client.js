@@ -12,6 +12,8 @@ import {
   register,
   me,
   updateDisplayName,
+  requestTeamFromAdmin,
+  cancelTeamRequest,
   logout,
   resendVerificationEmail,
   resetPassword,
@@ -58,7 +60,7 @@ export const api = {
   peekDashboard,
   peekGames,
   peekTeamId,
-  peekLeaderboards: (regionId) => peekLeaderboards(regionId),
+  peekLeaderboards: () => peekLeaderboards(),
   peekSeasonLeaderboard: (seasonId, regionId) => peekSeasonLeaderboard(seasonId, regionId),
 
   // Cache — for the one mutation that writes Firestore directly rather than
@@ -77,6 +79,8 @@ export const api = {
   getJoinRequests: (teamId) => getJoinRequests(teamId),
   handleJoinRequest: (memberId, action) => handleJoinRequest(memberId, action),
   leaveTeam: (teamId) => leaveTeam(teamId),
+  requestTeamFromAdmin: (note) => requestTeamFromAdmin(note),
+  cancelTeamRequest,
 
   // Games
   getGames,

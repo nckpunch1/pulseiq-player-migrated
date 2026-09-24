@@ -57,11 +57,11 @@ function LeaderboardTable({ entries, myTeamId }) {
 // the seed has to be composed too. Returns undefined unless every piece is
 // present — a half-seeded view would render as an empty table, which is a worse
 // lie than the loading state.
-function peekLeaderboardView(regionId) {
-  const lb = api.peekLeaderboards(regionId)
+function peekLeaderboardView() {
+  const lb = api.peekLeaderboards()
   if (!lb) return undefined
   const season = lb.current_season
-  const seasonEntries = season ? api.peekSeasonLeaderboard(season.id, regionId) : []
+  const seasonEntries = season ? api.peekSeasonLeaderboard(season.id, lb.region_id) : []
   if (seasonEntries === undefined) return undefined
   return {
     current_season: season,
@@ -77,14 +77,12 @@ export default function Leaderboard() {
   const [teamId, setTeamId] = useState(() => api.peekTeamId())
   // Last-known view for the default region, rendered immediately so navigating
   // back to this tab doesn't blank. undefined => nothing cached => real load.
-  const seed = useMemo(() => peekLeaderboardView(null), [])
+  const seed = useMemo(() => peekLeaderboardView(), [])
   const [data, setData] = useState(seed ?? null)
   const [error, setError] = useState('')
   const hasContent = useRef(seed !== undefined)
   const [tab, setTab] = useState('season') // season | alltime
   const [retryCount, setRetryCount] = useState(0)
-  const [regions, setRegions] = useState([])
-  const [selectedRegionId, setSelectedRegionId] = useState(null)
 
   useEffect(() => {
     api.getTeamId()
@@ -93,21 +91,16 @@ export default function Leaderboard() {
   }, [])
 
   useEffect(() => {
-    if (!teamId) return
-    api.listRegions?.()
-      .then(setRegions)
-      .catch(() => {})
-  }, [teamId])
-
-  useEffect(() => {
     let cancelled = false
 
     async function load() {
-      const lbData = await api.getLeaderboards(selectedRegionId)
+      // Always the player's own team region: leaderboards are game data, and the
+      // regional rules let a player read only their team's region.
+      const lbData = await api.getLeaderboards()
 
       let seasonEntries = []
-      if (lbData.current_season) {
-        seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, selectedRegionId)
+      if (lbData.current_season && lbData.region_id) {
+        seasonEntries = await api.getSeasonLeaderboard(lbData.current_season.id, lbData.region_id)
       }
 
       if (cancelled) return
@@ -119,12 +112,8 @@ export default function Leaderboard() {
       hasContent.current = true
     }
 
-    // Seed from *this* region's cache. On a region switch with nothing cached we
-    // deliberately clear and show the loading state: holding the previous
-    // region's table under a new region's heading would be showing wrong
-    // numbers, which is worse than a brief load. Navigation back to a region
-    // already seen stays instant.
-    const regionSeed = peekLeaderboardView(selectedRegionId)
+    // Seed from cache so navigating back to this tab stays instant.
+    const regionSeed = peekLeaderboardView()
     hasContent.current = regionSeed !== undefined
     setData(regionSeed ?? null)
     setError('')
@@ -137,7 +126,7 @@ export default function Leaderboard() {
       })
 
     return () => { cancelled = true }
-  }, [retryCount, selectedRegionId])
+  }, [retryCount])
 
   // Spinner only when there is genuinely nothing correct to show. `data` covers
   // the table itself — a separate `loading` flag would say nothing this doesn't,
@@ -229,52 +218,6 @@ export default function Leaderboard() {
           All Time
         </button>
       </div>
-
-      {regions.length > 1 && (
-        <div style={{
-          display: 'flex', gap: '0.5rem',
-          overflowX: 'auto', paddingBottom: '0.5rem',
-          marginBottom: '1rem',
-        }}>
-          <button
-            onClick={() => setSelectedRegionId(null)}
-            style={{
-              padding: '0.375rem 0.875rem', borderRadius: 99,
-              border: '1px solid',
-              borderColor: selectedRegionId === null
-                ? '#f97316' : 'rgba(255,255,255,0.15)',
-              background: selectedRegionId === null
-                ? 'rgba(249,115,22,0.15)' : 'transparent',
-              color: selectedRegionId === null ? '#f97316' : '#888',
-              fontSize: '0.8rem', fontWeight: 600,
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            All Regions
-          </button>
-          {regions.map(r => (
-            <button
-              key={r.id}
-              onClick={() => setSelectedRegionId(r.id)}
-              style={{
-                padding: '0.375rem 0.875rem', borderRadius: 99,
-                border: '1px solid',
-                borderColor: selectedRegionId === r.id
-                  ? '#f97316' : 'rgba(255,255,255,0.15)',
-                background: selectedRegionId === r.id
-                  ? 'rgba(249,115,22,0.15)' : 'transparent',
-                color: selectedRegionId === r.id ? '#f97316' : '#888',
-                fontSize: '0.8rem', fontWeight: 600,
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              📍 {r.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <LeaderboardTable entries={entries} myTeamId={teamId} />
 

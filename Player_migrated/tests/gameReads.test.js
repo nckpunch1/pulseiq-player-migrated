@@ -12,12 +12,13 @@ vi.mock('firebase/firestore', () => {
     getDoc: vi.fn(async p => snap(p)),
     getDocs: vi.fn(async source => {
       const p = source.path ?? source
-      let selected = [...records.keys()].filter(key => source.group ? key.split('/').at(-2) === source.group : key.startsWith(`${p}/`) && key.split('/').length === p.split('/').length + 1)
+      const group = source.group ?? p?.group
+      let selected = [...records.keys()].filter(key => group ? key.split('/').at(-2) === group : key.startsWith(`${p}/`) && key.split('/').length === p.split('/').length + 1)
       for (const f of source.filters ?? []) {
         if (f.limit) selected = selected.slice(0, f.limit)
         else {
-          if (f.op !== '==') throw new Error('Unsupported fixture operator')
-          selected = selected.filter(key => records.get(key)[f.field] === f.value)
+          if (f.op !== '==' && f.op !== 'in') throw new Error('Unsupported fixture operator')
+          selected = selected.filter(key => (f.op === 'in' ? f.value.includes(records.get(key)[f.field]) : records.get(key)[f.field] === f.value))
         }
       }
       return { docs: selected.map(snap), empty: selected.length === 0 }
@@ -32,9 +33,9 @@ import { clear } from '../src/api/cache'
 beforeEach(() => {
   vi.clearAllMocks(); records.clear(); clear()
   records.set('users/p', { teamId: 'a' })
-  records.set('teams/a', { name: 'Alpha', captainId: 'p' })
+  records.set('teams/a', { name: 'Alpha', captainId: 'p', regionId: 'north' })
   records.set('teams/a/members/random-id', { userId: 'p', role: 'captain' })
-  records.set('sessions/night', { name: 'Quiz', status: 'open', venueId: 'pub', startsAt: { toDate: () => new Date('2026-09-22T08:00:00Z') } })
+  records.set('sessions/night', { name: 'Quiz', status: 'open', regionId: 'north', venueId: 'pub', startsAt: { toDate: () => new Date('2026-09-22T08:00:00Z') } })
   records.set('venues/pub', { name: 'The Pub' })
 })
 afterEach(clear)
@@ -82,7 +83,7 @@ it('missing venue documents fall back to the stored venue name', async () => {
 function board() {
   records.set('teams/b', { isActive: true })
   records.set('teams/inactive', { isActive: false })
-  records.set('seasons/s1', { status: 'active', name: 'Spring' })
+  records.set('seasons/s1', { status: 'active', name: 'Spring', regionId: 'north' })
   records.set('seasons/s1/leaderboard/a_north', { teamId: 'a', teamName: 'Alpha', regionId: 'north', totalPoints: 10, gamesPlayed: 1, roundScores: { 1: 7, 2: 3 } })
   records.set('seasons/s1/leaderboard/b_north', { teamId: 'b', teamName: 'Beta', regionId: 'north', totalPoints: 10, gamesPlayed: 1, roundScores: { 1: 6, 2: 4 } })
   records.set('seasons/s1/leaderboard/missing_north', { teamId: 'missing', regionId: 'north', totalPoints: 999 })
@@ -100,17 +101,19 @@ it('season standings exclude archived/inactive/orphan rows and break ties from t
 it('aggregates only retained teams across seasons and deduplicates team reads', async () => {
   board()
   records.set('seasons/s2/leaderboard/a_north', { teamId: 'a', regionId: 'north', totalPoints: 5, gamesPlayed: 2 })
-  const result = await getLeaderboards('north')
+  const result = await getLeaderboards()
   expect(result.current_season.id).toBe('s1')
   expect(result.all_time_leaderboard).toMatchObject([
     { team_id: 'a', total_points: 15, games_played: 3, rank: 1 },
     { team_id: 'b', total_points: 10, games_played: 1, rank: 2 },
   ])
-  expect(getDoc.mock.calls.filter(([p]) => p === 'teams/a')).toHaveLength(1)
+  // One read to learn the viewer's team region, then ONE for the retained-team
+  // check even though team a appears in two seasons (deduplicated).
+  expect(getDoc.mock.calls.filter(([p]) => p === 'teams/a')).toHaveLength(2)
 })
 it('supports legacy bare/composite identities and snake-case fields without losing zero totals', async () => {
   records.set('seasons/old/leaderboard/a_north', { regionId: 'north', team_name: 'Alpha', total_points: 0, games_played: 2 })
-  expect((await getLeaderboards('north')).all_time_leaderboard).toEqual([{ team_id: 'a', team_name: 'Alpha', total_points: 0, games_played: 2, rank: 1 }])
+  expect((await getLeaderboards()).all_time_leaderboard).toEqual([{ team_id: 'a', team_name: 'Alpha', total_points: 0, games_played: 2, rank: 1 }])
 })
 it('does not reuse another season or region cache entry', async () => {
   board()

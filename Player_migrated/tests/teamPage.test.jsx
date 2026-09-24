@@ -75,12 +75,13 @@ vi.mock('firebase/auth', () => ({ onAuthStateChanged: (_auth, cb) => { queueMicr
 const api = vi.hoisted(() => ({
   listRegions: vi.fn(), searchTeams: vi.fn(), requestToJoin: vi.fn(), createTeam: vi.fn(),
   handleJoinRequest: vi.fn(), leaveTeam: vi.fn(), invalidateTeamAndGameState: vi.fn(),
+  requestTeamFromAdmin: vi.fn(), cancelTeamRequest: vi.fn(),
 }))
 vi.mock('../src/api/client', () => ({ api }))
 vi.mock('../src/hooks/useAuth', () => ({ useAuth: () => ({ setSessionFromResponse: vi.fn() }) }))
 vi.mock('../src/api/inviteEmail', () => ({ sendInviteEmail: vi.fn() }))
 
-import { setDoc, updateDoc } from 'firebase/firestore'
+import { getDocs, setDoc, updateDoc } from 'firebase/firestore'
 import { sendInviteEmail } from '../src/api/inviteEmail'
 import Team from '../src/pages/Team'
 
@@ -105,6 +106,7 @@ beforeEach(() => {
   api.createTeam.mockResolvedValue({ team: { id: 'new' } })
   api.handleJoinRequest.mockResolvedValue({})
   api.leaveTeam.mockResolvedValue({ team: null })
+  api.requestTeamFromAdmin.mockResolvedValue({ request: { status: 'pending', region_id: 'north' } })
 })
 afterEach(cleanup)
 
@@ -232,64 +234,86 @@ describe('team view', () => {
   })
 })
 
-describe('captain invites', () => {
+describe('captain invites (server-side lookup: the app never reads other profiles)', () => {
   const invite = async email => {
     fireEvent.change(await screen.findByPlaceholderText('player@email.com'), { target: { value: email } })
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
   }
+  const reply = (status, body) => ({ ok: status < 300, status, json: async () => body })
+  const readsOtherProfiles = () => getDocs.mock.calls.some(([q]) => q?.src?.path === 'users' || q?.path === 'users')
   beforeEach(() => { signIn('cap'); seed({ ...OWLS, 'users/cap': { role: 'player', teamId: 'owls' } }) })
 
-  it('adds a registered teamless player straight onto the team at members/{uid}', async () => {
-    seed({ 'users/newbie': { email: 'newbie@example.test', displayName: 'Newbie', teamId: null } })
+  it('the server adds a registered same-region player; the client writes nothing itself', async () => {
+    sendInviteEmail.mockResolvedValueOnce(reply(200, { outcome: 'added', displayName: 'Newbie' }))
     renderTeam()
     await invite('Newbie@Example.test ')
     expect(await screen.findByText(/Newbie added to your team/)).toBeTruthy()
-    expect(setDoc).toHaveBeenCalledWith({ type: 'doc', path: 'teams/owls/members/newbie' }, expect.objectContaining({ userId: 'newbie', status: 'member', role: 'member' }))
+    expect(sendInviteEmail).toHaveBeenCalledWith(expect.objectContaining({ toEmail: 'newbie@example.test', teamId: 'owls', teamName: 'Owls' }))
+    expect(setDoc).not.toHaveBeenCalled()
+    expect(readsOtherProfiles()).toBe(false)
   })
 
-  it('says so when the player is already on this team, without writing', async () => {
-    seed({ 'users/mem': { email: 'mem@example.test', displayName: 'Mem', teamId: 'owls' } })
+  it('reports a player who is already on this team', async () => {
+    sendInviteEmail.mockResolvedValueOnce(reply(200, { outcome: 'already_member', displayName: 'Mem' }))
     renderTeam()
     await invite('mem@example.test')
     expect(await screen.findByText(/Mem is already in your team/)).toBeTruthy()
-    expect(setDoc).not.toHaveBeenCalled()
   })
 
   it('refuses a player who is already on another team', async () => {
-    seed({ 'users/other': { email: 'other@example.test', displayName: 'Other', teamId: 'hawks' } })
+    sendInviteEmail.mockResolvedValueOnce(reply(409, { outcome: 'other_team', displayName: 'Other' }))
     renderTeam()
     await invite('other@example.test')
     expect(await screen.findByText(/Other is already on another team/)).toBeTruthy()
-    expect(setDoc).not.toHaveBeenCalled()
   })
 
-  it('emails an unregistered address with the team, and reports each server outcome', async () => {
-    sendInviteEmail.mockResolvedValueOnce({ ok: true })
+  it('refuses a player from another region, saying why', async () => {
+    sendInviteEmail.mockResolvedValueOnce(reply(403, { outcome: 'wrong_region', displayName: 'Brissy' }))
+    renderTeam()
+    await invite('brissy@example.test')
+    expect(await screen.findByText(/Brissy is in a different region/)).toBeTruthy()
+  })
+
+  it('emails an unregistered address, and reports each other server outcome', async () => {
+    sendInviteEmail.mockResolvedValueOnce(reply(200, { outcome: 'emailed' }))
     renderTeam()
     await invite('stranger@example.test')
     expect(await screen.findByText(/Invite sent to stranger@example.test/)).toBeTruthy()
-    expect(sendInviteEmail).toHaveBeenCalledWith(expect.objectContaining({ toEmail: 'stranger@example.test', teamId: 'owls', teamName: 'Owls' }))
 
-    sendInviteEmail.mockResolvedValueOnce({ ok: false, status: 403 })
+    sendInviteEmail.mockResolvedValueOnce(reply(403, {}))
     await invite('stranger@example.test')
     expect(await screen.findByText(/Couldn't send invite/)).toBeTruthy()
 
-    sendInviteEmail.mockResolvedValueOnce({ ok: false, status: 500 })
+    sendInviteEmail.mockResolvedValueOnce(reply(500, {}))
     await invite('stranger@example.test')
     expect(await screen.findByText('Failed to send invite. Try again.')).toBeTruthy()
+
+    sendInviteEmail.mockResolvedValueOnce({ ok: true, status: 200, stubbed: true })
+    await invite('stranger@example.test')
+    expect(await screen.findByText(/DEV: invitation simulated/)).toBeTruthy()
+    expect(readsOtherProfiles()).toBe(false)
   })
 })
 
 describe('asking an admin for a team', () => {
-  it('a teamless player files a pending team request once', async () => {
-    signIn('solo')
-    seed({ 'users/solo': { role: 'player', teamId: null, regions: ['north'], displayName: 'Solo' } })
+  beforeEach(() => { signIn('solo'); seed({ 'users/solo': { role: 'player', teamId: null, regions: ['north'], displayName: 'Solo' } }) })
+  const openForm = async () => fireEvent.click(await screen.findByRole('button', { name: /I need a team/ }))
+  const send = () => fireEvent.click(screen.getAllByRole('button').find(b => /send|submit|request/i.test(b.textContent) && !/I need a team/.test(b.textContent)))
+
+  it('files the request through the client (which tags the profile region)', async () => {
     renderTeam()
-    fireEvent.click(await screen.findByRole('button', { name: /I need a team/ }))
+    await openForm()
     fireEvent.change(screen.getByPlaceholderText(/Optional note/), { target: { value: 'solo player' } })
-    const send = screen.getAllByRole('button').find(b => /send|submit|request/i.test(b.textContent) && !/I need a team/.test(b.textContent))
-    fireEvent.click(send)
-    await waitFor(() => expect([...store.records.entries()].some(([p, d]) => p.startsWith('teamRequests/') && d.playerId === 'solo' && d.status === 'pending' && d.note === 'solo player')).toBe(true))
+    send()
+    await waitFor(() => expect(api.requestTeamFromAdmin).toHaveBeenCalledWith('solo player'))
     expect(text()).not.toContain('Failed to send request')
+  })
+
+  it('a region-less account is told why the request cannot be routed', async () => {
+    api.requestTeamFromAdmin.mockRejectedValue(Object.assign(new Error("Your account doesn't have a home region yet. Ask an admin to set your region."), { code: 'NEEDS_REGION' }))
+    renderTeam()
+    await openForm()
+    send()
+    expect(await screen.findByText(/doesn't have a home region yet/)).toBeTruthy()
   })
 })

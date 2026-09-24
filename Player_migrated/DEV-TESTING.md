@@ -19,3 +19,7 @@ AdminHost also stubs its current `/api/send-invite` and `/api/send-notification`
 Firebase Authentication verification and password-reset messages are separate SDK paths and are **not stubbed**. Use existing DEV test accounts for membership tests; only use controlled inboxes for signup/reset/verification. Stubbing invitation/notification endpoints does not test email delivery, template rendering or server authorization.
 
 The shared Pulse app/secondary connection is unchanged. No Firestore rules are deployed by starting either local app. Follow AdminHost's `docs/team-writes-dev-verification.md` for rules snapshot, deployment and real-app checks.
+
+## Invites on DEV
+
+Captain invites go to `/api/send-invite`. The server finds a registered player by email, checks that they are in the team's region and not on another team, and then adds them; an unregistered address is emailed instead. A DEV build never calls that endpoint (no DEV admin API is deployed), so on DEV **every invite is simulated** ("DEV: invitation simulated"), including one to a registered player. To test adding a registered player on DEV, have them request to join and approve it, or allocate them from the admin Dashboard.

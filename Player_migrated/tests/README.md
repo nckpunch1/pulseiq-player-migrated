@@ -20,11 +20,11 @@ Component tests for `src/pages/Team.jsx`, run with the normal suite. An in-memor
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH FIREBASE_EMULATORS_PATH=/tmp/pulseiq-firebase-emulators npm run test:integration
 ```
 
-Gaps follow the KNOWN GAP convention. `npm run test:integration` pins today's behaviour; `npm run test:integration:rollout` requires the target and fails until each gap is fixed:
+All four gaps the suite first found are **fixed**, so `npm run test:integration:rollout` (strict) passes. Future gaps should follow the KNOWN GAP convention: pin today's behaviour, and require the target under `REGION_ROLLOUT_STRICT=1`.
 
-| ID | Gap under the regional rules |
-| --- | --- |
-| INT-01 | Profile rename writes `display_name`. Nothing reads it, and the rules don't allow it (`displayName` is the field). |
-| INT-02 | `handleJoinRequest('approve')` also writes the applicant's `users.teamId` as the captain, which the rules refuse, so approval fails. |
-| INT-03 | `getGames` queries sessions with no region filter and reads registrations through a collection-group query. Both are refused, so the Games list fails for every player. |
-| INT-04 | Captain invite finds the invitee with `users WHERE email ==`. Players may only read their own profile, so inviting a registered player fails. |
+| ID | Was | Fix |
+| --- | --- | --- |
+| INT-01 | Profile rename wrote `display_name`, which nothing read and the rules refused | `updateDisplayName` writes `displayName` |
+| INT-02 | Join approval also wrote the applicant's `users.teamId` as the captain, which the rules refuse | Approval accepts the member row only; the applicant adopts the team from the accepted row |
+| INT-03 | Games, Dashboard and Leaderboards made unscoped queries | Every game/leaderboard query is scoped to the **team** region; registrations are read per session; teamless players get none |
+| INT-04 | Captain invite read `users WHERE email ==` | Registered players are found and added server-side (`/api/send-invite`), with region and team checks |

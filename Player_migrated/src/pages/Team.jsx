@@ -2,7 +2,7 @@ import { sendInviteEmail } from '../api/inviteEmail'
 import { regionSet } from '../lib/regionAccess'
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { doc, collection, query, onSnapshot, addDoc, getDocs, getDoc, setDoc, updateDoc, where, serverTimestamp, collectionGroup } from 'firebase/firestore'
+import { doc, collection, query, onSnapshot, getDocs, getDoc, updateDoc, where, collectionGroup } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, firestore } from '../lib/firebase'
 import { api } from '../api/client'
@@ -291,28 +291,14 @@ export default function Team() {
     setTeamRequestStatus('submitting')
     setRequestError('')
     try {
-      await addDoc(collection(firestore, 'teamRequests'), {
-        playerId: user.uid,
-        playerName: auth.currentUser?.displayName
-          ?? userData?.displayName
-          ?? userData?.firstName
-          ?? auth.currentUser?.email?.split('@')[0]
-          ?? 'Unknown',
-        playerEmail: user.email ?? '',
-        note: requestNote.trim(),
-        status: 'pending',
-        resolvedTeamId: null,
-        resolvedTeamName: null,
-        createdAt: serverTimestamp(),
-        resolvedAt: null,
-        resolvedBy: null,
-      })
+      // Carries the player's profile region, which routes it to that region's admins.
+      await api.requestTeamFromAdmin(requestNote)
       setTeamRequestStatus('pending')
       setShowRequestForm(false)
     } catch (e) {
       console.error(e)
       setTeamRequestStatus(null)
-      setRequestError('Failed to send request. Please try again.')
+      setRequestError(e?.code === 'NEEDS_REGION' ? e.message : 'Failed to send request. Please try again.')
     }
   }
 
@@ -396,67 +382,34 @@ export default function Team() {
     setInviteResult(null)
 
     try {
-      const userSnap = await getDocs(query(
-        collection(firestore, 'users'),
-        where('email', '==', email)
-      ))
+      // The server finds the player by email (the app may not read other players'
+      // profiles), checks they are free and in this team's region, and adds them;
+      // an unregistered address gets an email invitation instead.
+      const res = await sendInviteEmail({
+        toEmail: email,
+        captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
+        teamName: team?.name ?? 'the team',
+        teamId: team.id,
+      })
+      const body = res.stubbed ? { outcome: 'stubbed' } : await res.json().catch(() => ({}))
+      const who = body.displayName ?? email
 
-      if (!userSnap.empty) {
-        const existingUser = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() }
-
-        const memberSnap = await getDocs(query(
-          collection(firestore, 'teams', team.id, 'members'),
-          where('userId', '==', existingUser.id)
-        ))
-
-        if (!memberSnap.empty) {
-          setInviteResult({ type: 'info', message: `${existingUser.displayName ?? email} is already in your team` })
-          setInviting(false)
-          return
-        }
-
-        if (existingUser.teamId && existingUser.teamId !== team.id) {
-          setInviteResult({ type: 'error', message: `${existingUser.displayName ?? email} is already on another team` })
-          setInviting(false)
-          return
-        }
-
-        await setDoc(
-          doc(firestore, 'teams', team.id, 'members', existingUser.id),
-          {
-            userId: existingUser.id,
-            displayName: existingUser.displayName ?? existingUser.firstName ?? email.split('@')[0],
-            role: 'member',
-            status: 'member',
-            joinedAt: serverTimestamp(),
-          }
-        )
-
-        setInviteResult({ type: 'success', message: `${existingUser.displayName ?? email} added to your team` })
+      if (res.ok && body.outcome === 'added') {
+        setInviteResult({ type: 'success', message: `${who} added to your team` })
         setInviteEmail('')
-
+      } else if (res.ok && body.outcome === 'already_member') {
+        setInviteResult({ type: 'info', message: `${who} is already in your team` })
+      } else if (res.ok) {
+        setInviteResult({ type: 'sent', message: res.stubbed ? 'DEV: invitation simulated. No email was sent.' : `Invite sent to ${email} — they'll need to register first` })
+        setInviteEmail('')
+      } else if (res.status === 409) {
+        setInviteResult({ type: 'error', message: `${who} is already on another team` })
+      } else if (res.status === 403 && body.outcome === 'wrong_region') {
+        setInviteResult({ type: 'error', message: `${who} is in a different region. Players can only join a team in their own region.` })
+      } else if (res.status === 401 || res.status === 403) {
+        setInviteResult({ type: 'error', message: "Couldn't send invite — please refresh and try again" })
       } else {
-        if (!auth.currentUser) {
-          setInviteResult({ type: 'error', message: 'Please sign in to send invites' })
-          setInviting(false)
-          return
-        }
-
-        const res = await sendInviteEmail({
-          toEmail: email,
-          captainName: membership?.displayName ?? userData?.displayName ?? 'Your captain',
-          teamName: team?.name ?? 'the team',
-          teamId: team.id,
-        })
-
-        if (res.ok) {
-          setInviteResult({ type: 'sent', message: res.stubbed ? 'DEV: invitation simulated. No email was sent.' : `Invite sent to ${email} — they'll need to register first` })
-          setInviteEmail('')
-        } else if (res.status === 401 || res.status === 403) {
-          setInviteResult({ type: 'error', message: "Couldn't send invite — please refresh and try again" })
-        } else {
-          setInviteResult({ type: 'error', message: 'Failed to send invite. Try again.' })
-        }
+        setInviteResult({ type: 'error', message: 'Failed to send invite. Try again.' })
       }
     } catch (e) {
       console.error('Invite error:', e)
@@ -662,19 +615,9 @@ export default function Team() {
               <button
                 onClick={async () => {
                   if (!confirm('Cancel your team request?')) return
-                  const user = auth.currentUser
-                  if (!user) return
+                  if (!auth.currentUser) return
                   try {
-                    const snap = await getDocs(query(
-                      collection(firestore, 'teamRequests'),
-                      where('playerId', '==', user.uid),
-                      where('status', '==', 'pending')
-                    ))
-                    await Promise.all(
-                      snap.docs.map(d => updateDoc(d.ref, {
-                        status: 'cancelled'
-                      }))
-                    )
+                    await api.cancelTeamRequest()
                     setTeamRequestStatus(null)
                   } catch (e) {
                     console.error(e)

@@ -5,8 +5,10 @@
 //
 // Only the app's Firebase bootstrap is replaced: `firestore` becomes an emulator
 // context for whichever user is "signed in", and Auth sign-up is simulated.
-// Gaps follow the repo's KNOWN GAP convention: normal runs pin today's behaviour,
-// REGION_ROLLOUT_STRICT=1 (npm run test:integration:rollout) demands the target.
+// No known gaps remain (INT-01..04 fixed), so normal and strict
+// (npm run test:integration:rollout) runs are identical. A new gap should follow
+// the KNOWN GAP convention: pin today's behaviour, demand the target under
+// REGION_ROLLOUT_STRICT=1.
 import process from 'node:process'
 import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -34,7 +36,6 @@ import * as client from '../../src/api/firebaseClient'
 import { clear as clearCache } from '../../src/api/cache'
 
 const PROJECT = 'demo-pulseiq-player-int'
-const strictRollout = process.env.REGION_ROLLOUT_STRICT === '1'
 let env
 
 // Act as `uid` from here on: every client call runs under that user's auth.
@@ -91,6 +92,13 @@ beforeEach(async () => {
     // Teamless North players.
     'users/solo': { role: 'player', teamId: null, regions: ['north'], displayName: 'Solo', username: 'solo@example.test' },
     'users/founder': { role: 'player', teamId: null, regions: ['north'], displayName: 'Founder' },
+    // A South free agent (another region's player).
+    'users/southSolo': { role: 'player', teamId: null, regions: ['south'], displayName: 'South Solo' },
+    // Seasons and standings, one per region.
+    'seasons/northSpring': { name: 'North Spring', regionId: 'north', status: 'active' },
+    'seasons/northSpring/leaderboard/owls_north': { teamId: 'owls', teamName: 'Owls', regionId: 'north', totalPoints: 12, gamesPlayed: 2, rank: 1 },
+    'seasons/southSpring': { name: 'South Spring', regionId: 'south', status: 'active' },
+    'seasons/southSpring/leaderboard/owlsSouth_south': { teamId: 'owlsSouth', teamName: 'Owls', regionId: 'south', totalPoints: 99, gamesPlayed: 9, rank: 1 },
     // Games.
     'venues/pub': { name: 'North Pub', regionId: 'north' },
     'sessions/northNight': { name: 'North Night', regionId: 'north', venueId: 'pub', hostId: 'host', status: 'open', soldOut: false, visibility: 'public', date: future },
@@ -159,22 +167,15 @@ describe('discovering and joining a team', () => {
     expect(await peek('teams/owls/members/solo')).toBeUndefined()
   })
 
-  // INT-02: handleJoinRequest('approve') also writes the APPLICANT's users/{uid}.teamId
-  // as the captain. The regional rules only let a player write their own profile, so
-  // approval fails as a whole. Target: approval updates only the member row, and the
-  // applicant adopts the team themselves (Team.jsx watcher, accepted rows only).
-  it('INT-02 KNOWN GAP: a captain approves a join request under the regional rules', async () => {
+  // INT-02 (fixed): approval accepts the member row only; the captain never writes
+  // the applicant's profile (the rules refuse that). The applicant adopts the team.
+  it('INT-02: a captain approves a join request; the applicant adopts the team and gains its region only', async () => {
     as('solo'); await client.requestToJoin('owls')
     as('cap')
-    expect(await allowed(client.handleJoinRequest('solo', 'approve'))).toBe(strictRollout)
-  })
-
-  it('after approval the applicant adopts the team and gains its region only', async () => {
-    as('solo'); await client.requestToJoin('owls')
-    // Approval of the member row itself (the part the captain may do).
-    as('cap')
-    const { updateDoc } = await import('firebase/firestore')
-    await updateDoc(doc(actor.firestore, 'teams', 'owls', 'members', 'solo'), { status: 'member' })
+    const { members } = await client.handleJoinRequest('solo', 'approve')
+    expect(members.map(m => m.player_id)).toContain('solo')
+    expect(await peek('teams/owls/members/solo')).toMatchObject({ status: 'member' })
+    expect((await peek('users/solo')).teamId).toBeNull()
     as('solo')
     // Same own-rows collection-group query the Team.jsx approval watcher runs.
     const rows = await getDocs(query(collectionGroup(actor.firestore, 'members'), where('userId', '==', 'solo')))
@@ -183,6 +184,12 @@ describe('discovering and joining a team', () => {
     expect((await client.getTeam()).team).toMatchObject({ id: 'owls' })
     expect(await allowed(getDoc(doc(actor.firestore, 'sessions', 'northNight')))).toBe(true)
     expect(await allowed(getDoc(doc(actor.firestore, 'sessions', 'southNight')))).toBe(false)
+  })
+
+  it('a player cannot request to join another region\'s team, even bypassing search', async () => {
+    as('southSolo')
+    expect(await allowed(client.requestToJoin('owls'))).toBe(false)
+    expect(await peek('teams/owls/members/southSolo')).toBeUndefined()
   })
 
   it('a member leaves: own row removed, profile cleared', async () => {
@@ -194,22 +201,39 @@ describe('discovering and joining a team', () => {
 })
 
 describe('captain invites', () => {
-  // INT-04: Team.jsx invites an existing player by first finding their profile with
-  // users WHERE email == <address>. The regional rules only let a player read their
-  // OWN profile, so the lookup is refused and inviting a registered player fails.
-  // Target: an invite path that does not need to read other players' profiles
-  // (e.g. server-side lookup), with the member write still captain-scoped.
-  it('INT-04 KNOWN GAP: a captain looks up a registered player by email to invite them', async () => {
+  // INT-04 (fixed): invites of registered players are resolved server-side
+  // (/api/send-invite -> api/_lib/invitePlayer.js, tested in admin-host), so the
+  // Player no longer reads other profiles. Reading them stays refused; a captain's
+  // direct member write is also refused across regions (a team is single-region).
+  it('INT-04: profile lookups by email stay refused, so the app must not need them', async () => {
     as('cap')
-    // Same query Team.jsx handleInvitePlayer runs.
-    const lookup = getDocs(query(collection(actor.firestore, 'users'), where('email', '==', 'solo@example.test')))
-    expect(await allowed(lookup)).toBe(strictRollout)
+    expect(await allowed(getDocs(query(collection(actor.firestore, 'users'), where('email', '==', 'solo@example.test'))))).toBe(false)
   })
 
-  it('the captain-scoped member write itself is permitted (members/{uid}, accepted)', async () => {
+  it('a captain can add a same-region player, never a player from another region', async () => {
     as('cap')
-    await setDoc(doc(actor.firestore, 'teams', 'owls', 'members', 'solo'), { userId: 'solo', displayName: 'Solo', role: 'member', status: 'member' })
-    expect(await peek('teams/owls/members/solo')).toMatchObject({ status: 'member' })
+    const add = uid => setDoc(doc(actor.firestore, 'teams', 'owls', 'members', uid), { userId: uid, displayName: uid, role: 'member', status: 'member' })
+    expect(await allowed(add('southSolo'))).toBe(false)
+    expect(await allowed(add('solo'))).toBe(true)
+  })
+})
+
+describe('asking an admin for a team', () => {
+  it('a teamless player\'s request carries their profile region, and they can withdraw it', async () => {
+    as('solo')
+    expect((await client.requestTeamFromAdmin('any team')).request).toEqual({ status: 'pending', region_id: 'north' })
+    let requests
+    await env.withSecurityRulesDisabled(async c => { requests = (await getDocs(collection(c.firestore(), 'teamRequests'))).docs.map(d => d.data()) })
+    expect(requests).toEqual([expect.objectContaining({ playerId: 'solo', regionId: 'north', status: 'pending', note: 'any team' })])
+    expect((await client.cancelTeamRequest()).cancelled).toBe(1)
+    await env.withSecurityRulesDisabled(async c => { requests = (await getDocs(collection(c.firestore(), 'teamRequests'))).docs.map(d => d.data().status) })
+    expect(requests).toEqual(['cancelled'])
+  })
+
+  it('a region-less account cannot file one (nothing to route it to)', async () => {
+    await seed({ 'users/solo': { role: 'player', teamId: null, displayName: 'Solo' } })
+    as('solo')
+    await expect(client.requestTeamFromAdmin()).rejects.toMatchObject({ code: 'NEEDS_REGION' })
   })
 })
 
@@ -224,10 +248,13 @@ describe('game registration (captain)', () => {
     expect((await peek('sessions/northNight/registrations/owls')).attendanceStatus).toBe('not_attending')
   })
 
-  it('the rules refuse a registration for another region, whatever the client does', async () => {
+  it('a registration for another region is refused by the client before any write (and the rules too)', async () => {
     as('cap')
-    expect(await allowed(client.registerForGame('southNight', 6))).toBe(false)
+    await expect(client.registerForGame('southNight', 6)).rejects.toMatchObject({ code: 'WRONG_REGION' })
     expect(await peek('sessions/southNight/registrations/owls')).toBeUndefined()
+    // Belt and braces: the direct write is refused by the rules as well.
+    const write = setDoc(doc(actor.firestore, 'sessions', 'southNight', 'registrations', 'owls'), { teamId: 'owls', regionId: 'south', teamName: 'Owls', teamSize: 6, attendanceStatus: 'not_requested' })
+    expect(await allowed(write)).toBe(false)
   })
 
   it('the rules refuse an ordinary member acting for the team (PL-01 is only a client-message gap)', async () => {
@@ -247,23 +274,59 @@ describe('reading games and teams', () => {
     expect(team.members.map(m => m.player_id).sort()).toEqual(['cap', 'mem'])
   })
 
-  // INT-03: getGames queries sessions by status only (no region constraint) and
-  // reads registrations through a collection-group query, both of which the
-  // regional rules refuse. The whole Games list fails for every player, not just
-  // shows extra games (PL-03/PL-04 describe the client-side symptom).
-  it('INT-03 KNOWN GAP: a member loads their games list under the regional rules', async () => {
+  // INT-03 (fixed): games, the dashboard and leaderboards query the TEAM region
+  // only, and registrations are read per session, so the rules permit every read.
+  it('INT-03: a member sees only their team region\'s games, with their registration status', async () => {
+    as('cap'); await client.registerForGame('northNight', 5)
     as('mem')
-    expect(await allowed(client.getGames())).toBe(strictRollout)
+    const { games } = await client.getGames()
+    expect(games.map(g => [g.id, g.registration_status])).toEqual([['northNight', 'registered']])
+  })
+
+  it('a teamless player sees no games and no dashboard games', async () => {
+    as('solo')
+    expect((await client.getGames()).games).toEqual([])
+    expect((await client.dashboard()).upcoming_games).toEqual([])
+  })
+
+  it('the dashboard shows the team region\'s games and the team\'s season standing', async () => {
+    as('mem')
+    const dash = await client.dashboard()
+    expect(dash.team).toMatchObject({ id: 'owls' })
+    expect(dash.upcoming_games.map(g => g.id)).toEqual(['northNight'])
+    expect(dash.leaderboard_summary).toMatchObject({ team_current_season_rank: 1 })
+  })
+
+  it('the captain dashboard also lists pending join requests', async () => {
+    as('solo'); await client.requestToJoin('owls')
+    as('cap')
+    expect((await client.dashboard()).pending_join_requests.map(r => r.player_id)).toEqual(['solo'])
+  })
+
+  it('leaderboards show the team region only: its active season and all-time table', async () => {
+    as('mem')
+    const boards = await client.getLeaderboards()
+    expect(boards.region_id).toBe('north')
+    expect(boards.current_season).toMatchObject({ id: 'northSpring' })
+    expect(boards.all_time_leaderboard.map(r => r.team_id)).toEqual(['owls'])
+    expect((await client.getSeasonLeaderboard('northSpring', 'north')).map(r => r.team_id)).toEqual(['owls'])
+  })
+
+  it('a teamless player has no standings to show', async () => {
+    as('solo')
+    expect(await client.getLeaderboards()).toEqual({ current_season: null, all_time_leaderboard: [], region_id: null })
   })
 })
 
 describe('profile', () => {
-  // INT-01: Profile writes `display_name`, which nothing reads (every reader uses
-  // `displayName`) and which the regional rules do not allow a player to set.
-  it('INT-01 KNOWN GAP: a player renames themselves and the app sees the new name', async () => {
+  // INT-01 (fixed): the rename writes `displayName`, the field the app reads and
+  // the rules allow; the dead `display_name` field is gone.
+  it('INT-01: a player renames themselves and the app sees the new name', async () => {
     as('mem')
-    const renamed = await allowed(client.updateDisplayName('mem', 'Renamed'))
-    const visible = renamed && (await peek('users/mem')).displayName === 'Renamed'
-    expect(visible).toBe(strictRollout)
+    await client.updateDisplayName('mem', 'Renamed')
+    const profile = await peek('users/mem')
+    expect(profile.displayName).toBe('Renamed')
+    expect(profile).not.toHaveProperty('display_name')
+    expect((await client.me()).player.display_name).toBe('Renamed')
   })
 })

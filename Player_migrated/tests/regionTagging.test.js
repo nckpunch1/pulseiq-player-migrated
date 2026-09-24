@@ -72,9 +72,10 @@ it('signup never guesses a region: none selected, or one that does not exist, cr
   await expect(register({ first_name: 'A', last_name: 'B', email: 'a@example.com', password: 'test-only', region_id: 'missing' })).rejects.toMatchObject({ code: 'REGION_NOT_FOUND' })
   expect(docs.has('users/new-player')).toBe(false)
 })
-it('tags registrations from the session, not the team or profile', async () => {
+it('tags registrations from the session, not the profile', async () => {
+  // Profile (discovery) region North; team and session both South.
   docs.set('users/player', { teamId: 'a', regions: ['north'] })
-  docs.set('teams/a', { name: 'Alpha', regionId: 'north' })
+  docs.set('teams/a', { name: 'Alpha', regionId: 'south' })
   docs.set('sessions/night', { regionId: 'south' })
   await registerForGame('night', 8)
   expect(docs.get('sessions/night/registrations/a')).toMatchObject({ regionId: 'south', teamSize: 8, attendanceStatus: 'not_requested' })
@@ -149,27 +150,25 @@ it.each([
     expect(updateDoc).not.toHaveBeenCalled()
   }
 })
-it('PL-02 KNOWN GAP: a captain cannot register a team in another region', async () => {
+it('PL-02: a captain cannot register a team in another region (refused before writing)', async () => {
   seedPlayerJourney({ sessionRegion: 'south' })
-  expect(await applicationRejected(registerForGame('night', 6))).toBe(strictRollout)
-  if (strictRollout) expect(setDoc).not.toHaveBeenCalled()
+  await expect(registerForGame('night', 6)).rejects.toMatchObject({ code: 'WRONG_REGION' })
+  expect(setDoc).not.toHaveBeenCalled()
 })
-it('PL-03 KNOWN GAP: teamless players receive no games and issue no sessions query', async () => {
+it('PL-03: teamless players receive no games and issue no sessions query', async () => {
   docs.set('sessions/night', { regionId: 'north', status: 'open', visibility: 'public' })
   const result = await getGames()
-  expect(result.games.map(game => game.id)).toEqual(strictRollout ? [] : ['night'])
-  if (strictRollout) expect(getDocs).not.toHaveBeenCalled()
+  expect(result.games).toEqual([])
+  expect(getDocs).not.toHaveBeenCalled()
 })
-it('PL-04 KNOWN GAP: game discovery queries and returns only the team region', async () => {
+it('PL-04: game discovery queries and returns only the team region', async () => {
   seedPlayerJourney()
   docs.set('sessions/foreign', { regionId: 'south', status: 'open', visibility: 'public' })
   const result = await getGames()
-  expect(result.games.map(game => game.id).sort()).toEqual(strictRollout ? ['night'] : ['foreign', 'night'])
-  if (strictRollout) {
-    const sessionQueries = getDocs.mock.calls.map(([q]) => q).filter(q => q.path === 'sessions')
-    expect(sessionQueries.length).toBeGreaterThan(0)
-    for (const q of sessionQueries) expect(q.filters).toContainEqual({ field: 'regionId', op: '==', value: 'north' })
-  }
+  expect(result.games.map(game => game.id)).toEqual(['night'])
+  const sessionQueries = getDocs.mock.calls.map(([q]) => q).filter(q => q.path === 'sessions')
+  expect(sessionQueries.length).toBeGreaterThan(0)
+  for (const q of sessionQueries) expect(q.filters).toContainEqual({ field: 'regionId', op: '==', value: 'north' })
 })
 
 it('cached team reads stay separated when accounts switch on a shared device', async () => {
@@ -246,7 +245,7 @@ it('join request list excludes accepted members and other teams', async () => {
   docs.set('teams/b/members/foreign', { userId: 'foreign', status: 'pending' })
   expect((await getJoinRequests('a')).requests).toEqual([expect.objectContaining({ id: 'pending', player_id: 'applicant', player_name: 'Applicant' })])
 })
-it('approval activates membership, assigns the applicant team and invalidates cached team state', async () => {
+it('approval activates membership only (the applicant adopts the team themselves) and invalidates cached team state', async () => {
   seedPlayerJourney()
   docs.set('users/applicant', { teamId: null })
   docs.set('teams/a/members/request', { userId: 'applicant', status: 'pending', displayName: 'Applicant' })
@@ -254,7 +253,8 @@ it('approval activates membership, assigns the applicant team and invalidates ca
   seedCache(cacheKey('getGames', 'player'), { games: ['old'] })
   const result = await handleJoinRequest('request', 'approve')
   expect(docs.get('teams/a/members/request')).toMatchObject({ status: 'member', role: 'member' })
-  expect(docs.get('users/applicant').teamId).toBe('a')
+  // INT-02: a captain never writes another player's profile.
+  expect(docs.get('users/applicant').teamId).toBeNull()
   expect(result.members).toContainEqual(expect.objectContaining({ player_id: 'applicant', status: 'active', is_captain: false }))
   expect(peekTeamId()).toBeUndefined()
   expect(peekGames()).toBeUndefined()
